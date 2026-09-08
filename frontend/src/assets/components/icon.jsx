@@ -139,3 +139,51 @@ export function MenuIcon(p) {
         </svg>
     );
 }
+
+export const UserIcon = (p) => (
+    <svg {...base} {...p}>
+        <circle cx="12" cy="8" r="4" />
+        <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
+    </svg>
+);
+
+export const CogIcon = (p) => (
+    <svg {...base} {...p}>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1L14.5 2h-5l-.4 2.6a7 7 0 0 0-1.7 1l-2.3-1-2 3.4L3.1 11a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.4 2.6h5l.4-2.6a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5a7 7 0 0 0 .1-1z" />
+    </svg>
+);
+
+export const ThemeIcon = (p) => (
+    <svg {...base} {...p}>
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19" />
+    </svg>
+);
+
+export const KeyboardIcon = (p) => (
+    <svg {...base} {...p}>
+        <rect x="2" y="6" width="20" height="12" rx="2" />
+        <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8" />
+    </svg>
+);
+
+export const HelpIcon = (p) => (
+    <svg {...base} {...p}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1 .9-1 1.7M12 17h.01" />
+    </svg>
+);
+
+export const LogoutIcon = (p) => (
+    <svg {...base} {...p}>
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+        <path d="M16 17l5-5-5-5M21 12H9" />
+    </svg>
+);
+
+export const ChevronDown = (p) => (
+    <svg {...base} {...p}>
+        <path d="m6 9 6 6 6-6" />
+    </svg>
+);

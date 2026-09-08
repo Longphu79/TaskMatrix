@@ -12,8 +12,8 @@ import {
     ChevronDownIcon,
     MenuIcon,
 } from "../assets/components/icon";
+import UserDropdown from "../assets/components/UserDropdown";
 
-// Đã chuẩn hóa path khớp chính xác với App.jsx
 const NAV = [
     {
         key: "dashboard",
@@ -38,9 +38,6 @@ const NAV = [
     },
 ];
 
-const AVATAR =
-    "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&h=120&fit=crop&auto=format";
-
 function Sidebar({ open, onClose }) {
     const navigate = useNavigate();
     const location = useLocation();
@@ -60,7 +57,7 @@ function Sidebar({ open, onClose }) {
             >
                 <div className="mb-10 px-3">
                     <span className="font-display text-2xl font-bold tracking-tight text-ink">
-                        TASK<span className="text-brand">MATRIX.</span>
+                        TASK<span className="text-brand">Y.</span>
                     </span>
                 </div>
 
@@ -109,9 +106,9 @@ function Sidebar({ open, onClose }) {
 
 function Topbar({ onMenu }) {
     const [query, setQuery] = useState("");
+    const navigate = useNavigate();
     const location = useLocation();
 
-    // Tìm route tương ứng để hiển thị tên trang trên Header
     const currentNav = NAV.find((n) => n.path === location.pathname);
     const title = currentNav ? currentNav.label : "Dashboard";
 
@@ -149,19 +146,8 @@ function Topbar({ onMenu }) {
                 <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-brand ring-2 ring-white" />
             </button>
 
-            <div className="flex shrink-0 items-center gap-3 rounded-full bg-white py-1.5 pl-4 pr-1.5">
-                <div className="hidden whitespace-nowrap text-right leading-tight sm:block">
-                    <div className="text-sm font-semibold text-ink">
-                        Manjay Gupta
-                    </div>
-                    <div className="text-xs text-muted">UI/UX Designer</div>
-                </div>
-                <img
-                    src={AVATAR}
-                    alt="Manjay Gupta"
-                    className="h-10 w-10 shrink-0 rounded-full bg-canvas object-cover"
-                />
-            </div>
+            {/* Điều hướng từ UserDropdown qua react-router */}
+            <UserDropdown onNavigate={(key) => navigate(`/${key}`)} />
         </header>
     );
 }
@@ -176,7 +162,8 @@ export default function MainLayout() {
             <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
                 <Topbar onMenu={() => setSidebarOpen(true)} />
 
-                <main className="flex-1 overflow-y-auto px-5 pb-8 lg:px-8">
+                <main className="flex-1 overflow-y-auto">
+                    {/* Outlet render nội dung từng trang tương ứng với Route */}
                     <Outlet />
                 </main>
             </div>
