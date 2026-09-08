@@ -54,7 +54,7 @@ const INITIAL_TODOS = [
 
 function IconChip({ children }) {
     return (
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-soft text-brand">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-soft text-brand dark:bg-brand/20">
             {children}
         </div>
     );
@@ -62,7 +62,7 @@ function IconChip({ children }) {
 
 function ProgressBar({ pct }) {
     return (
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-hairline">
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-hairline dark:bg-slate-700">
             <div
                 className="h-full rounded-full bg-brand transition-all"
                 style={{ width: `${pct}%` }}
@@ -74,10 +74,10 @@ function ProgressBar({ pct }) {
 function CardHead({ title }) {
     return (
         <div className="mb-5 flex items-center justify-between">
-            <h3 className="font-display text-[17px] font-semibold text-ink">
+            <h3 className="font-display text-[17px] font-semibold text-ink dark:text-white">
                 {title}
             </h3>
-            <button className="rounded-lg p-1 text-muted transition hover:bg-canvas hover:text-ink">
+            <button className="rounded-lg p-1 text-muted transition hover:bg-canvas hover:text-ink dark:hover:bg-slate-700 dark:hover:text-white">
                 <MoreIcon width={18} height={18} />
             </button>
         </div>
@@ -86,17 +86,23 @@ function CardHead({ title }) {
 
 function StatCard({ label, value, Icon }) {
     return (
-        <div className="rounded-3xl bg-white p-6 shadow-[0_8px_30px_rgba(17,17,26,0.04)]">
-            <div className="mb-8 flex items-start justify-between">
-                <span className="text-sm font-medium text-muted">{label}</span>
-                <MoreIcon width={18} height={18} className="text-muted" />
+        <div className="rounded-3xl bg-white p-6 shadow-[0_8px_30px_rgba(17,17,26,0.04)] dark:bg-slate-800/90 dark:border dark:border-slate-700/50">
+            <div className="mb-6 flex items-start justify-between">
+                <span className="text-sm font-medium text-muted dark:text-slate-400">
+                    {label}
+                </span>
+                <MoreIcon
+                    width={18}
+                    height={18}
+                    className="text-muted dark:text-slate-400"
+                />
             </div>
             <div className="flex items-end justify-between">
-                <span className="font-display text-3xl font-bold text-ink">
+                <span className="font-display text-3xl font-bold text-ink dark:text-white">
                     {value}
                 </span>
                 <IconChip>
-                    <Icon width={22} height={22} />
+                    <Icon width={20} height={20} />
                 </IconChip>
             </div>
         </div>
@@ -106,12 +112,12 @@ function StatCard({ label, value, Icon }) {
 function TimeTracker() {
     const [running, setRunning] = useState(false);
     return (
-        <div className="flex items-center justify-between rounded-3xl bg-ink p-5 pl-7 text-white shadow-[0_16px_40px_rgba(28,28,28,0.25)]">
+        <div className="flex items-center justify-between rounded-3xl bg-[#1c1c1c] p-5 pl-7 text-white shadow-[0_16px_40px_rgba(28,28,28,0.25)] dark:bg-slate-800 dark:border dark:border-slate-700/50">
             <div>
-                <div className="font-display text-lg font-semibold">
+                <div className="font-display text-lg font-semibold text-white">
                     {running ? "Stop Time Tracker" : "Start Time Tracker"}
                 </div>
-                <div className="mt-0.5 text-xs text-white/50">
+                <div className="mt-0.5 text-xs text-white/60">
                     {running
                         ? "Recording your session…"
                         : "Track your work session"}
@@ -119,7 +125,7 @@ function TimeTracker() {
             </div>
             <button
                 onClick={() => setRunning((r) => !r)}
-                className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-ink transition hover:scale-105 active:scale-95"
+                className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-slate-900 transition hover:scale-105 active:scale-95"
             >
                 {running ? (
                     <PauseIcon width={22} height={22} />
@@ -133,7 +139,7 @@ function TimeTracker() {
 
 function RecentActivity() {
     return (
-        <div className="rounded-3xl bg-white p-6 shadow-[0_8px_30px_rgba(17,17,26,0.04)]">
+        <div className="rounded-3xl bg-white p-6 shadow-[0_8px_30px_rgba(17,17,26,0.04)] dark:bg-slate-800/90 dark:border dark:border-slate-700/50">
             <CardHead title="Recent Activity" />
             <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -142,11 +148,11 @@ function RecentActivity() {
                         alt="Rubik Sans"
                         className="h-9 w-9 rounded-full bg-canvas object-cover"
                     />
-                    <span className="text-sm font-semibold text-ink">
+                    <span className="text-sm font-semibold text-ink dark:text-white">
                         Rubik Sans
                     </span>
                 </div>
-                <button className="rounded-full border border-hairline px-4 py-1.5 text-xs font-medium text-muted transition hover:border-brand hover:text-ink">
+                <button className="rounded-full border border-hairline px-4 py-1.5 text-xs font-medium text-muted transition hover:border-brand hover:text-ink dark:border-slate-700 dark:hover:border-brand dark:hover:text-white">
                     View All
                 </button>
             </div>
@@ -168,18 +174,18 @@ function RecentActivity() {
 
 function ProjectsPanel() {
     return (
-        <div className="flex flex-col rounded-3xl bg-white p-6 shadow-[0_8px_30px_rgba(17,17,26,0.04)]">
+        <div className="flex flex-col rounded-3xl bg-white p-6 shadow-[0_8px_30px_rgba(17,17,26,0.04)] dark:bg-slate-800/90 dark:border dark:border-slate-700/50">
             <CardHead title="Projects" />
             <div className="flex-1 space-y-4">
                 {PROJECTS.map((p) => (
                     <div key={p.name} className="flex items-center gap-3">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-soft text-brand">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-soft text-brand dark:bg-brand/20">
                             <FolderIcon width={16} height={16} />
                         </span>
-                        <span className="w-28 shrink-0 text-sm font-medium text-ink">
+                        <span className="w-28 shrink-0 text-sm font-medium text-ink dark:text-white">
                             {p.name}
                         </span>
-                        <span className="rounded-md bg-canvas px-2.5 py-1 text-xs font-medium text-muted">
+                        <span className="rounded-md bg-canvas px-2.5 py-1 text-xs font-medium text-muted dark:bg-slate-700 dark:text-slate-300">
                             {p.time}
                         </span>
                         <div className="flex-1">
@@ -189,7 +195,7 @@ function ProjectsPanel() {
                 ))}
             </div>
             <div className="mt-6 flex justify-end">
-                <button className="rounded-xl bg-ink px-5 py-2 text-xs font-medium text-white transition hover:bg-black">
+                <button className="rounded-xl bg-[#1c1c1c] px-5 py-2 text-xs font-medium text-white transition hover:bg-black dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200">
                     View All
                 </button>
             </div>
@@ -199,9 +205,9 @@ function ProjectsPanel() {
 
 function MembersPanel() {
     return (
-        <div className="rounded-3xl bg-white p-6 shadow-[0_8px_30px_rgba(17,17,26,0.04)]">
+        <div className="rounded-3xl bg-white p-6 shadow-[0_8px_30px_rgba(17,17,26,0.04)] dark:bg-slate-800/90 dark:border dark:border-slate-700/50">
             <CardHead title="Members" />
-            <div className="mb-3 grid grid-cols-[1fr_auto_auto] gap-6 px-1 text-xs font-medium text-muted">
+            <div className="mb-3 grid grid-cols-[1fr_auto_auto] gap-6 px-1 text-xs font-medium text-muted dark:text-slate-400">
                 <span>Member Info</span>
                 <span className="w-16 text-right">Today</span>
                 <span className="w-16 text-right">This Week</span>
@@ -210,7 +216,7 @@ function MembersPanel() {
                 {MEMBERS.map((m) => (
                     <div
                         key={m.name}
-                        className="grid grid-cols-[1fr_auto_auto] items-center gap-6 rounded-2xl px-1 py-2.5 transition hover:bg-canvas"
+                        className="grid grid-cols-[1fr_auto_auto] items-center gap-6 rounded-2xl px-1 py-2.5 transition hover:bg-canvas dark:hover:bg-slate-700/50"
                     >
                         <div className="flex items-center gap-3">
                             <img
@@ -219,21 +225,21 @@ function MembersPanel() {
                                 className="h-10 w-10 rounded-full bg-canvas object-cover"
                             />
                             <div className="leading-tight">
-                                <div className="text-sm font-semibold text-ink">
+                                <div className="text-sm font-semibold text-ink dark:text-white">
                                     {m.name}
                                 </div>
-                                <div className="text-xs font-medium text-ink/70">
+                                <div className="text-xs font-medium text-ink/70 dark:text-slate-300">
                                     {m.role}
                                 </div>
-                                <div className="text-[11px] text-muted">
+                                <div className="text-[11px] text-muted dark:text-slate-400">
                                     {m.note}
                                 </div>
                             </div>
                         </div>
-                        <span className="w-16 text-right text-xs font-medium text-ink">
+                        <span className="w-16 text-right text-xs font-medium text-ink dark:text-white">
                             {m.today}
                         </span>
-                        <span className="w-16 text-right text-xs font-medium text-ink">
+                        <span className="w-16 text-right text-xs font-medium text-ink dark:text-white">
                             {m.week}
                         </span>
                     </div>
@@ -252,9 +258,9 @@ function TodoPanel() {
             ),
         );
     return (
-        <div className="flex flex-col rounded-3xl bg-white p-6 shadow-[0_8px_30px_rgba(17,17,26,0.04)]">
+        <div className="flex flex-col rounded-3xl bg-white p-6 shadow-[0_8px_30px_rgba(17,17,26,0.04)] dark:bg-slate-800/90 dark:border dark:border-slate-700/50">
             <CardHead title="To Do" />
-            <div className="mb-3 flex items-center justify-between px-1 text-xs font-medium text-muted">
+            <div className="mb-3 flex items-center justify-between px-1 text-xs font-medium text-muted dark:text-slate-400">
                 <span>To Dos</span>
                 <span>Time</span>
             </div>
@@ -265,8 +271,8 @@ function TodoPanel() {
                             onClick={() => toggle(i)}
                             className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition ${
                                 t.done
-                                    ? "border-brand bg-brand text-ink"
-                                    : "border-hairline hover:border-brand"
+                                    ? "border-brand bg-brand text-slate-900"
+                                    : "border-hairline hover:border-brand dark:border-slate-600"
                             }`}
                         >
                             {t.done && (
@@ -288,7 +294,9 @@ function TodoPanel() {
                         </button>
                         <span
                             className={`w-40 shrink-0 text-sm font-medium ${
-                                t.done ? "text-muted line-through" : "text-ink"
+                                t.done
+                                    ? "text-muted line-through dark:text-slate-500"
+                                    : "text-ink dark:text-white"
                             }`}
                         >
                             {t.name}
@@ -296,14 +304,14 @@ function TodoPanel() {
                         <div className="flex-1">
                             <ProgressBar pct={t.done ? 100 : t.pct} />
                         </div>
-                        <span className="text-xs font-medium text-muted">
+                        <span className="text-xs font-medium text-muted dark:text-slate-400">
                             {t.time}
                         </span>
                     </div>
                 ))}
             </div>
             <div className="mt-6 flex justify-end">
-                <button className="rounded-xl bg-ink px-5 py-2 text-xs font-medium text-white transition hover:bg-black">
+                <button className="rounded-xl bg-[#1c1c1c] px-5 py-2 text-xs font-medium text-white transition hover:bg-black dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200">
                     View Reports
                 </button>
             </div>
@@ -313,22 +321,22 @@ function TodoPanel() {
 
 export default function Dashboard() {
     return (
-        <>
+        <div className="px-5 pb-8 lg:px-8">
             {/* Header row */}
-            <div className="mb-6 grid gap-5 lg:grid-cols-[1fr_minmax(0,380px)]">
+            <div className="mb-6 grid gap-5 lg:grid-cols-[1fr_minmax(0,360px)]">
                 <div className="flex flex-col justify-center">
-                    <h2 className="font-display text-3xl font-bold text-ink">
+                    <h2 className="font-display text-3xl font-bold text-ink dark:text-white">
                         Today
                     </h2>
-                    <p className="mt-1 text-sm font-medium text-muted">
+                    <p className="mt-1 text-sm font-medium text-muted dark:text-slate-400">
                         Mon 22, 2021 | 10:00 AM
                     </p>
                 </div>
                 <TimeTracker />
             </div>
 
-            {/* Stat cards */}
-            <div className="mb-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {/* Stat cards - LUÔN 3 CỘT NẰM NGANG TRÊN MÁY TÍNH */}
+            <div className="mb-6 grid gap-5 grid-cols-1 md:grid-cols-3">
                 <StatCard label="Weekly Activity" value="0%" Icon={ChartIcon} />
                 <StatCard
                     label="Worked This Week"
@@ -349,6 +357,6 @@ export default function Dashboard() {
                 <MembersPanel />
                 <TodoPanel />
             </div>
-        </>
+        </div>
     );
 }

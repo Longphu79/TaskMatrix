@@ -50,8 +50,9 @@ function Sidebar({ open, onClose }) {
                     onClick={onClose}
                 />
             )}
+            {/* Thêm shrink-0 và overflow-hidden để cố định chiều rộng */}
             <aside
-                className={`fixed z-40 flex h-full w-64 flex-col bg-white px-5 py-7 transition-transform lg:static lg:translate-x-0 ${
+                className={`fixed z-40 flex h-full w-64 shrink-0 flex-col overflow-hidden bg-white px-5 py-7 transition-transform lg:static lg:translate-x-0 ${
                     open ? "translate-x-0" : "-translate-x-full"
                 }`}
             >
@@ -65,13 +66,14 @@ function Sidebar({ open, onClose }) {
                     {NAV.map(({ key, label, path, Icon }) => {
                         const isActive = location.pathname === path;
                         return (
+                            /* Thêm w-full để nút ôm trọn khung Sidebar */
                             <button
                                 key={key}
                                 onClick={() => {
                                     navigate(path);
                                     onClose();
                                 }}
-                                className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
+                                className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
                                     isActive
                                         ? "bg-ink text-white shadow-[0_10px_20px_rgba(28,28,28,0.18)]"
                                         : "text-muted hover:bg-canvas hover:text-ink"
@@ -146,7 +148,6 @@ function Topbar({ onMenu }) {
                 <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-brand ring-2 ring-white" />
             </button>
 
-            {/* Điều hướng từ UserDropdown qua react-router */}
             <UserDropdown onNavigate={(key) => navigate(`/${key}`)} />
         </header>
     );
@@ -163,7 +164,6 @@ export default function MainLayout() {
                 <Topbar onMenu={() => setSidebarOpen(true)} />
 
                 <main className="flex-1 overflow-y-auto">
-                    {/* Outlet render nội dung từng trang tương ứng với Route */}
                     <Outlet />
                 </main>
             </div>
