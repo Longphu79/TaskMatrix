@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import {useNavigate} from "react-router-dom";
+
 import {
     UserIcon,
     CogIcon,
@@ -68,6 +70,7 @@ export default function UserDropdown({ onNavigate }) {
     const [dark, setDark] = useState(false);
     const ref = useRef(null);
     const { isDark, toggleTheme } = useTheme();
+    const navigate = useNavigate();
 
     useEffect(() => {
         if (!open) return;
@@ -236,7 +239,10 @@ export default function UserDropdown({ onNavigate }) {
                     {/* log out */}
                     <div className="p-2">
                         <button
-                            onClick={() => setOpen(false)}
+                            onClick={() => {
+                                setOpen(false);
+                                navigate("/login");
+                            }}
                             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#e05656] transition hover:bg-[#fdecec]"
                         >
                             <LogoutIcon />

@@ -58,7 +58,7 @@ function Sidebar({ open, onClose }) {
             >
                 <div className="mb-10 px-3">
                     <span className="font-display text-2xl font-bold tracking-tight text-ink">
-                        TASK<span className="text-brand">Y.</span>
+                        TASK<span className="text-brand">MATRIX.</span>
                     </span>
                 </div>
 

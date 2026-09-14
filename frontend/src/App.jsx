@@ -6,6 +6,7 @@ import TimesheetsPage from "./pages/Timesheets";
 import TodoPage from "./pages/Todo";
 import ReportPage from "./pages/Report";
 import SettingsPage from "./pages/Settings";
+import LoginPage from "./features/auth/pages/Login";
 
 export default function App() {
     return (
@@ -16,6 +17,7 @@ export default function App() {
                     path="/"
                     element={<Navigate to="/dashboard" replace />}
                 />
+                <Route path="/login" element={<LoginPage />} />
 
                 {/* BỌC MAINLAYOUT TẠI ĐÂY */}
                 <Route element={<MainLayout />}>
