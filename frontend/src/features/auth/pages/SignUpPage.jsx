@@ -12,38 +12,70 @@ import {
     Spinner,
 } from "../../../assets/components/AuthShared";
 
-export default function LoginPage() {
+function scorePassword(pw) {
+    let score = 0;
+    if (pw.length >= 8) score++;
+    if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+    if (/\d/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+    return Math.min(score, 3);
+}
+
+const STRENGTH = [
+    { label: "Weak", color: "#e05656" },
+    { label: "Fair", color: "#f6c62e" },
+    { label: "Good", color: "#f6c62e" },
+    { label: "Strong", color: "#3fb27f" },
+];
+
+export default function SignUpPage() {
     const navigate = useNavigate();
-    const { login } = useAuth();
+    const { signup } = useAuth();
     const { dark, toggleTheme } = useTheme();
+    const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [confirm, setConfirm] = useState("");
     const [showPassword, setShowPassword] = useState(false);
-    const [remember, setRemember] = useState(true);
+    const [agree, setAgree] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+
+    const strength = scorePassword(password);
+    const mismatch = confirm.length > 0 && confirm !== password;
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (loading) return;
+        if (!agree) {
+            setError("Please accept the Terms of Service to continue.");
+            return;
+        }
+        if (password !== confirm) {
+            setError("Passwords do not match.");
+            return;
+        }
+        setError("");
         setLoading(true);
-        await login({ email, password });
+        await signup({ name, email, password });
         navigate("/dashboard", {
-            state: { toast: "Welcome back to TASKMATRIX!" },
+            state: { toast: "Account created — welcome to TASKY!" },
         });
     };
 
     const social = async (provider) => {
         if (loading) return;
         setLoading(true);
-        await login({ email: `you@${provider}.com` });
-        navigate("/dashboard", { state: { toast: "Signed in successfully!" } });
+        await signup({ name: "", email: `you@${provider}.com` });
+        navigate("/dashboard", {
+            state: { toast: "Account created successfully!" },
+        });
     };
 
     return (
         <div className="grid min-h-full w-full bg-canvas lg:grid-cols-2">
-            <AuthHero tagline="Manage your workspace, track time & boost team productivity." />
+            <AuthHero tagline="Join thousands of teams shipping better work with TASKY." />
 
-            {/* right column — form */}
             <div className="relative flex items-center justify-center px-5 py-10 sm:px-10">
                 <button
                     onClick={toggleTheme}
@@ -79,7 +111,6 @@ export default function LoginPage() {
                         <span aria-hidden>←</span> Back to home
                     </Link>
 
-                    {/* mobile logo */}
                     <div className="mb-6 lg:hidden">
                         <span className="font-display text-2xl font-bold tracking-tight text-ink">
                             TASK<span className="text-brand">Y.</span>
@@ -87,15 +118,15 @@ export default function LoginPage() {
                     </div>
 
                     <h1 className="font-display text-2xl font-bold text-ink">
-                        Sign in to TASKMATRIX
+                        Create your account
                     </h1>
                     <p className="mt-1.5 text-sm text-muted">
-                        Don&apos;t have an account?{" "}
+                        Already have an account?{" "}
                         <Link
-                            to="/signup"
+                            to="/login"
                             className="font-medium text-brand transition hover:underline"
                         >
-                            Sign Up
+                            Log In
                         </Link>
                     </p>
 
@@ -115,7 +146,7 @@ export default function LoginPage() {
                     <div className="my-6 flex items-center gap-4">
                         <span className="h-px flex-1 bg-hairline" />
                         <span className="text-xs font-medium text-muted">
-                            Or continue with email
+                            Or sign up with email
                         </span>
                         <span className="h-px flex-1 bg-hairline" />
                     </div>
@@ -123,7 +154,21 @@ export default function LoginPage() {
                     <form onSubmit={handleSubmit} className="space-y-5">
                         <div>
                             <label className="mb-1.5 block text-sm font-medium text-ink">
-                                Email address
+                                Full name
+                            </label>
+                            <input
+                                type="text"
+                                required
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="Manjay Gupta"
+                                className="w-full rounded-xl border border-hairline bg-canvas px-4 py-3 text-sm text-ink outline-none transition placeholder:text-muted focus:border-brand focus:bg-white"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="mb-1.5 block text-sm font-medium text-ink">
+                                Work email
                             </label>
                             <input
                                 type="email"
@@ -147,7 +192,7 @@ export default function LoginPage() {
                                     onChange={(e) =>
                                         setPassword(e.target.value)
                                     }
-                                    placeholder="Enter your password"
+                                    placeholder="Create a strong password"
                                     className="w-full rounded-xl border border-hairline bg-canvas px-4 py-3 pr-12 text-sm text-ink outline-none transition placeholder:text-muted focus:border-brand focus:bg-white"
                                 />
                                 <button
@@ -163,23 +208,81 @@ export default function LoginPage() {
                                     <EyeIcon off={showPassword} />
                                 </button>
                             </div>
+
+                            {password && (
+                                <div className="mt-2.5">
+                                    <div className="flex gap-1.5">
+                                        {[0, 1, 2, 3].map((i) => (
+                                            <span
+                                                key={i}
+                                                className="h-1.5 flex-1 rounded-full transition-colors"
+                                                style={{
+                                                    background:
+                                                        i <= strength
+                                                            ? STRENGTH[strength]
+                                                                  .color
+                                                            : "var(--color-hairline)",
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+                                    <span
+                                        className="mt-1.5 block text-xs font-medium"
+                                        style={{
+                                            color: STRENGTH[strength].color,
+                                        }}
+                                    >
+                                        {STRENGTH[strength].label} password
+                                    </span>
+                                </div>
+                            )}
                         </div>
 
-                        <div className="flex items-center justify-between">
-                            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-ink">
-                                <CheckboxButton
-                                    checked={remember}
-                                    onClick={() => setRemember((r) => !r)}
-                                />
-                                Remember me for 30 days
+                        <div>
+                            <label className="mb-1.5 block text-sm font-medium text-ink">
+                                Confirm password
                             </label>
-                            <button
-                                type="button"
-                                className="text-sm font-medium text-brand transition hover:underline"
-                            >
-                                Forgot password?
-                            </button>
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                required
+                                value={confirm}
+                                onChange={(e) => setConfirm(e.target.value)}
+                                placeholder="Re-enter your password"
+                                className={`w-full rounded-xl border bg-canvas px-4 py-3 text-sm text-ink outline-none transition placeholder:text-muted focus:bg-white ${
+                                    mismatch
+                                        ? "border-[#e05656]"
+                                        : "border-hairline focus:border-brand"
+                                }`}
+                            />
+                            {mismatch && (
+                                <span className="mt-1.5 block text-xs font-medium text-[#e05656]">
+                                    Passwords do not match
+                                </span>
+                            )}
                         </div>
+
+                        <label className="flex cursor-pointer items-start gap-2.5 text-sm font-medium text-ink">
+                            <CheckboxButton
+                                checked={agree}
+                                onClick={() => setAgree((a) => !a)}
+                            />
+                            <span className="leading-snug">
+                                I agree to the{" "}
+                                <span className="text-brand hover:underline">
+                                    Terms of Service
+                                </span>{" "}
+                                &{" "}
+                                <span className="text-brand hover:underline">
+                                    Privacy Policy
+                                </span>
+                            </span>
+                        </label>
+
+                        {error && (
+                            <p className="text-sm font-medium text-[#e05656]">
+                                {error}
+                            </p>
+                        )}
 
                         <button
                             type="submit"
@@ -188,10 +291,10 @@ export default function LoginPage() {
                         >
                             {loading ? (
                                 <>
-                                    <Spinner /> Signing in…
+                                    <Spinner /> Creating account…
                                 </>
                             ) : (
-                                "Sign In"
+                                "Create Account"
                             )}
                         </button>
                     </form>

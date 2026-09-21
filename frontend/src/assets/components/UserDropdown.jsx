@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {useNavigate} from "react-router-dom";
-
+import { useNavigate } from "react-router-dom";
 import {
     UserIcon,
     CogIcon,
@@ -11,7 +10,8 @@ import {
     LogoutIcon,
     ChevronDown,
 } from "./icon";
-import { useTheme } from "./ThemeContext";
+import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
 
 const AVATAR =
     "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&h=120&fit=crop&auto=format";
@@ -21,6 +21,8 @@ const STATUSES = [
     { key: "away", label: "Away", color: "#f6c62e" },
     { key: "dnd", label: "Do Not Disturb", color: "#e05656" },
 ];
+
+/* ---------- theme toggle ---------- */
 
 function ThemeToggle({ dark, onChange }) {
     return (
@@ -63,14 +65,18 @@ function MenuItem({ Icon, label, onClick, trailing }) {
 
 /* ---------- component ---------- */
 
-export default function UserDropdown({ onNavigate }) {
+export default function UserDropdown() {
+    const { dark, setDark } = useTheme();
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
+
+    const displayName = user?.name || "Manjay Gupta";
+    const displayRole = user?.role || "UI/UX Designer";
+    const displayEmail = user?.email || "manjay.gupta@matrixdomain.com";
     const [open, setOpen] = useState(false);
     const [status, setStatus] = useState("online");
     const [statusOpen, setStatusOpen] = useState(false);
-    const [dark, setDark] = useState(false);
     const ref = useRef(null);
-    const { isDark, toggleTheme } = useTheme();
-    const navigate = useNavigate();
 
     useEffect(() => {
         if (!open) return;
@@ -86,8 +92,8 @@ export default function UserDropdown({ onNavigate }) {
 
     const current = STATUSES.find((s) => s.key === status);
 
-    const go = (key) => {
-        onNavigate?.(key);
+    const go = (path) => {
+        navigate(path);
         setOpen(false);
     };
 
@@ -100,14 +106,14 @@ export default function UserDropdown({ onNavigate }) {
             >
                 <div className="hidden whitespace-nowrap text-right leading-tight sm:block">
                     <div className="text-sm font-semibold text-ink">
-                        Manjay Gupta
+                        {displayName}
                     </div>
-                    <div className="text-xs text-muted">UI/UX Designer</div>
+                    <div className="text-xs text-muted">{displayRole}</div>
                 </div>
                 <div className="relative">
                     <img
                         src={AVATAR}
-                        alt="Manjay Gupta"
+                        alt={displayName}
                         className="h-10 w-10 shrink-0 rounded-full bg-canvas object-cover"
                     />
                     <span
@@ -125,18 +131,18 @@ export default function UserDropdown({ onNavigate }) {
                         <div className="flex items-center gap-3">
                             <img
                                 src={AVATAR}
-                                alt="Manjay Gupta"
+                                alt={displayName}
                                 className="h-12 w-12 rounded-full bg-canvas object-cover"
                             />
                             <div className="min-w-0">
                                 <div className="truncate text-sm font-semibold text-ink">
-                                    Manjay Gupta
+                                    {displayName}
                                 </div>
                                 <div className="truncate text-xs text-muted">
-                                    UI/UX Designer
+                                    {displayRole}
                                 </div>
                                 <div className="truncate text-xs text-muted">
-                                    manjay.gupta@matrixdomain.com
+                                    {displayEmail}
                                 </div>
                             </div>
                         </div>
@@ -190,17 +196,17 @@ export default function UserDropdown({ onNavigate }) {
                         <MenuItem
                             Icon={UserIcon}
                             label="My Profile"
-                            onClick={() => go("settings")}
+                            onClick={() => go("/settings")}
                         />
                         <MenuItem
                             Icon={CogIcon}
                             label="Account Settings"
-                            onClick={() => go("settings")}
+                            onClick={() => go("/settings")}
                         />
                         <MenuItem
                             Icon={BellIcon}
                             label="Notification Preferences"
-                            onClick={() => go("settings")}
+                            onClick={() => go("/settings")}
                         />
                     </div>
 
@@ -213,9 +219,7 @@ export default function UserDropdown({ onNavigate }) {
                                 <ThemeIcon />
                             </span>
                             <span className="flex-1 text-left">Theme Mode</span>
-
-                            {/* Truyền isDark và toggleTheme vào đây */}
-                            <ThemeToggle dark={isDark} onChange={toggleTheme} />
+                            <ThemeToggle dark={dark} onChange={setDark} />
                         </div>
                         <MenuItem
                             Icon={KeyboardIcon}
@@ -240,8 +244,9 @@ export default function UserDropdown({ onNavigate }) {
                     <div className="p-2">
                         <button
                             onClick={() => {
+                                logout();
                                 setOpen(false);
-                                navigate("/login");
+                                navigate("/");
                             }}
                             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#e05656] transition hover:bg-[#fdecec]"
                         >
