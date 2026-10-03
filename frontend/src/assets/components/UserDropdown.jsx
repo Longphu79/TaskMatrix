@@ -29,7 +29,10 @@ function ThemeToggle({ dark, onChange }) {
         <button
             onClick={(e) => {
                 e.stopPropagation();
-                onChange(!dark);
+                // Kiểm tra an toàn trước khi gọi hàm để tránh crash
+                if (typeof onChange === "function") {
+                    onChange(!dark);
+                }
             }}
             role="switch"
             aria-checked={dark}
@@ -66,7 +69,21 @@ function MenuItem({ Icon, label, onClick, trailing }) {
 /* ---------- component ---------- */
 
 export default function UserDropdown() {
-    const { dark, setDark } = useTheme();
+    const themeCtx = useTheme() || {};
+
+    // Tự động nhận diện biến trạng thái dark/isDark từ ThemeContext
+    const dark = Boolean(
+        themeCtx.dark ?? themeCtx.isDark ?? themeCtx.isDarkMode,
+    );
+
+    // Tự động nhận diện hàm thay đổi theme dù đặt tên là gì
+    const handleThemeToggle =
+        themeCtx.setDark ||
+        themeCtx.setIsDark ||
+        themeCtx.toggleTheme ||
+        themeCtx.setTheme ||
+        (() => {});
+
     const { user, logout } = useAuth();
     const navigate = useNavigate();
 
@@ -118,7 +135,7 @@ export default function UserDropdown() {
                     />
                     <span
                         className="absolute bottom-0 right-0 h-3 w-3 rounded-full ring-2 ring-white"
-                        style={{ background: current.color }}
+                        style={{ background: current?.color }}
                     />
                 </div>
             </button>
@@ -156,9 +173,9 @@ export default function UserDropdown() {
                                 <span className="flex items-center gap-2">
                                     <span
                                         className="h-2.5 w-2.5 rounded-full"
-                                        style={{ background: current.color }}
+                                        style={{ background: current?.color }}
                                     />
-                                    {current.label}
+                                    {current?.label}
                                 </span>
                                 <ChevronDown
                                     width={16}
@@ -219,7 +236,10 @@ export default function UserDropdown() {
                                 <ThemeIcon />
                             </span>
                             <span className="flex-1 text-left">Theme Mode</span>
-                            <ThemeToggle dark={dark} onChange={setDark} />
+                            <ThemeToggle
+                                dark={dark}
+                                onChange={handleThemeToggle}
+                            />
                         </div>
                         <MenuItem
                             Icon={KeyboardIcon}

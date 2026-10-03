@@ -9,6 +9,7 @@ import SettingsPage from "./pages/Settings";
 import LoginPage from "./features/auth/pages/Login";
 import SignUpPage from "./features/auth/pages/SignUpPage";
 import LandingPage from "./features/auth/pages/LandingPage";
+import ChatPage from "./pages/Chat";
 
 export default function App() {
     return (
@@ -28,6 +29,7 @@ export default function App() {
                     <Route path="/todo" element={<TodoPage />} />
                     <Route path="/report" element={<ReportPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/chat" element={<ChatPage />} />
                 </Route>
             </Routes>
         </BrowserRouter>
