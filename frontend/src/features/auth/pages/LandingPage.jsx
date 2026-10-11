@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useTheme } from "../../../assets/context/ThemeContext";
+import { useTheme } from "../../../context/ThemeContext";
 
 const NAV_LINKS = ["Features", "Productivity", "Solutions", "Pricing", "FAQ"];
 

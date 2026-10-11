@@ -1,11 +1,14 @@
 import { useState } from "react";
+import { useWorkspace } from "../../../context/WorkspaceContext";
+import { useTasks, parseISODate, taskHours } from "../../../context/TaskContext";
+import AddTaskModal from "../../../components/AddTaskModal";
 import {
     ListIcon,
     ClockIcon,
     FolderIcon,
     MoreIcon,
     SearchIcon,
-} from "../assets/components/icon";
+} from "../../../components/icon";
 
 /* ---------- data ---------- */
 
@@ -22,62 +25,43 @@ const PRIORITY = {
     Low: "bg-canvas text-muted",
 };
 
-const INITIAL_TASKS = [
-    {
-        id: 1,
-        title: "Creating Wireframe for Food Dashboard",
-        project: "Food Dashboard",
-        priority: "High",
-        progress: 78,
-        due: "Sep 08, 2026",
-        done: false,
-    },
-    {
-        id: 2,
-        title: "Research & Development for new module",
-        project: "Matrix Domain",
-        priority: "Medium",
-        progress: 40,
-        due: "Sep 10, 2026",
-        done: false,
-    },
-    {
-        id: 3,
-        title: "Prototype interaction states",
-        project: "Project Four",
-        priority: "High",
-        progress: 55,
-        due: "Sep 09, 2026",
-        done: false,
-    },
-    {
-        id: 4,
-        title: "Prepare client review deck",
-        project: "Project Three",
-        priority: "Low",
-        progress: 100,
-        due: "Sep 04, 2026",
-        done: true,
-    },
-    {
-        id: 5,
-        title: "Design QA and developer handoff",
-        project: "Food Dashboard",
-        priority: "Medium",
-        progress: 100,
-        due: "Sep 03, 2026",
-        done: true,
-    },
-    {
-        id: 6,
-        title: "Finalize typography and color tokens",
-        project: "Matrix Domain",
-        priority: "Low",
-        progress: 20,
-        due: "Sep 12, 2026",
-        done: false,
-    },
+const FALLBACK_COLORS = [
+    "#f6c62e",
+    "#1c1c1c",
+    "#f7d873",
+    "#9195a1",
+    "#3fb27f",
+    "#5b8def",
 ];
+
+function projectColor(project) {
+    if (PROJECT_COLORS[project]) return PROJECT_COLORS[project];
+    let hash = 0;
+    for (const ch of project) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+    return FALLBACK_COLORS[hash % FALLBACK_COLORS.length];
+}
+
+function formatDue(iso) {
+    return parseISODate(iso).toLocaleDateString("en-US", {
+        month: "short",
+        day: "2-digit",
+        year: "numeric",
+    });
+}
+
+function format12(time) {
+    const [h, m] = time.split(":").map(Number);
+    const hr = h % 12 === 0 ? 12 : h % 12;
+    return `${hr}:${String(m).padStart(2, "0")} ${h % 24 < 12 ? "AM" : "PM"}`;
+}
+
+function durationLabel(task) {
+    const { start, end } = taskHours(task);
+    const mins = Math.round((end - start) * 60);
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return h && m ? `${h}h ${m}m` : h ? `${h}h` : `${m}m`;
+}
 
 /* ---------- icons ---------- */
 
@@ -161,134 +145,22 @@ function SummaryCard({ label, value, accent, Icon }) {
     );
 }
 
-function ProgressBar({ pct, done }) {
+function ClockSmallIcon(p) {
     return (
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-hairline">
-            <div
-                className={`h-full rounded-full transition-all ${done ? "bg-[#3fb27f]" : "bg-brand"}`}
-                style={{ width: `${pct}%` }}
-            />
-        </div>
-    );
-}
-
-/* ---------- add-task modal ---------- */
-
-function AddTaskModal({ onClose, onSave }) {
-    const [form, setForm] = useState({
-        title: "",
-        project: "Food Dashboard",
-        priority: "Medium",
-        due: "",
-    });
-    const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
-    const inputCls =
-        "w-full rounded-xl border border-hairline bg-white px-4 py-2.5 text-sm text-ink outline-none transition placeholder:text-muted focus:border-brand";
-
-    return (
-        <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-            onClick={onClose}
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            width={15}
+            height={15}
+            {...p}
         >
-            <div
-                className="w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl"
-                onClick={(e) => e.stopPropagation()}
-            >
-                <div className="mb-6 flex items-center justify-between">
-                    <h3 className="font-display text-xl font-bold text-ink">
-                        Add Task
-                    </h3>
-                    <button
-                        onClick={onClose}
-                        className="rounded-lg p-1 text-muted transition hover:bg-canvas hover:text-ink"
-                    >
-                        <svg
-                            width="20"
-                            height="20"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                        >
-                            <path
-                                d="M6 6l12 12M18 6L6 18"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                            />
-                        </svg>
-                    </button>
-                </div>
-
-                <div className="space-y-4">
-                    <div>
-                        <label className="mb-1.5 block text-xs font-medium text-muted">
-                            Task Title
-                        </label>
-                        <input
-                            value={form.title}
-                            onChange={set("title")}
-                            placeholder="What needs to be done?"
-                            className={inputCls}
-                        />
-                    </div>
-                    <div>
-                        <label className="mb-1.5 block text-xs font-medium text-muted">
-                            Project
-                        </label>
-                        <select
-                            value={form.project}
-                            onChange={set("project")}
-                            className={inputCls}
-                        >
-                            {Object.keys(PROJECT_COLORS).map((p) => (
-                                <option key={p}>{p}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="mb-1.5 block text-xs font-medium text-muted">
-                                Priority
-                            </label>
-                            <select
-                                value={form.priority}
-                                onChange={set("priority")}
-                                className={inputCls}
-                            >
-                                <option>High</option>
-                                <option>Medium</option>
-                                <option>Low</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="mb-1.5 block text-xs font-medium text-muted">
-                                Due Date
-                            </label>
-                            <input
-                                type="date"
-                                value={form.due}
-                                onChange={set("due")}
-                                className={inputCls}
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                <div className="mt-7 flex justify-end gap-3">
-                    <button
-                        onClick={onClose}
-                        className="rounded-xl border border-hairline px-5 py-2.5 text-sm font-medium text-muted transition hover:text-ink"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={() => onSave(form)}
-                        className="rounded-xl bg-ink px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-black"
-                    >
-                        Add Task
-                    </button>
-                </div>
-            </div>
-        </div>
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3 2" />
+        </svg>
     );
 }
 
@@ -296,27 +168,28 @@ function AddTaskModal({ onClose, onSave }) {
 
 function TaskItem({ task, onToggle, onDelete }) {
     const [menuOpen, setMenuOpen] = useState(false);
-    const color = PROJECT_COLORS[task.project] ?? "#9195a1";
+    const color = projectColor(task.project);
+    const done = task.status === "Completed";
 
     return (
         <div className="flex items-center gap-4 rounded-2xl border border-hairline p-4 transition hover:border-brand/60 hover:bg-canvas/50">
             <button
                 onClick={() => onToggle(task.id)}
                 className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border transition ${
-                    task.done
+                    done
                         ? "border-[#3fb27f] bg-[#3fb27f] text-white"
                         : "border-hairline hover:border-brand"
                 }`}
                 aria-label="Toggle complete"
             >
-                {task.done && <CheckIcon />}
+                {done && <CheckIcon />}
             </button>
 
             <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                     <span
                         className={`truncate text-sm font-semibold ${
-                            task.done ? "text-muted line-through" : "text-ink"
+                            done ? "text-muted line-through" : "text-ink"
                         }`}
                     >
                         {task.title}
@@ -338,14 +211,15 @@ function TaskItem({ task, onToggle, onDelete }) {
                     </span>
                     <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted">
                         <CalendarIcon className="text-muted" />
-                        {task.due}
+                        {formatDue(task.dueDate)}
                     </span>
-                    <div className="flex min-w-[140px] flex-1 items-center gap-2">
-                        <ProgressBar pct={task.progress} done={task.done} />
-                        <span className="text-xs font-semibold text-muted">
-                            {task.progress}%
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted">
+                        <ClockSmallIcon className="text-muted" />
+                        {format12(task.startTime)} – {format12(task.endTime)}
+                        <span className="text-muted/70">
+                            ({durationLabel(task)})
                         </span>
-                    </div>
+                    </span>
                 </div>
             </div>
 
@@ -371,7 +245,7 @@ function TaskItem({ task, onToggle, onDelete }) {
                                 }}
                                 className="block w-full px-4 py-2 text-left text-sm text-ink transition hover:bg-canvas"
                             >
-                                {task.done ? "Mark active" : "Mark done"}
+                                {done ? "Mark active" : "Mark done"}
                             </button>
                             <button className="block w-full px-4 py-2 text-left text-sm text-ink transition hover:bg-canvas">
                                 Edit task
@@ -396,63 +270,39 @@ function TaskItem({ task, onToggle, onDelete }) {
 /* ---------- page ---------- */
 
 export default function TodoPage() {
-    const [tasks, setTasks] = useState(INITIAL_TASKS);
+    const { isPersonal } = useWorkspace();
+    const { tasks, toggleTask, deleteTask } = useTasks();
     const [tab, setTab] = useState("All");
     const [query, setQuery] = useState("");
     const [sort, setSort] = useState("priority");
     const [modalOpen, setModalOpen] = useState(false);
 
-    const tabs = ["All Tasks", "In Progress", "Completed"];
-
-    const toggle = (id) =>
-        setTasks((t) =>
-            t.map((x) =>
-                x.id === id
-                    ? {
-                          ...x,
-                          done: !x.done,
-                          progress: !x.done ? 100 : x.progress,
-                      }
-                    : x,
-            ),
-        );
-    const remove = (id) => setTasks((t) => t.filter((x) => x.id !== id));
-
-    const save = (form) => {
-        setTasks((t) => [
-            {
-                id: Date.now(),
-                title: form.title || "Untitled Task",
-                project: form.project,
-                priority: form.priority,
-                progress: 0,
-                due: form.due || "No due date",
-                done: false,
-            },
-            ...t,
-        ]);
-        setModalOpen(false);
-    };
+    const tabs = ["All Tasks", "Pending", "Completed"];
 
     const priorityRank = { High: 0, Medium: 1, Low: 2 };
     const filtered = tasks
         .filter((t) => {
-            if (tab === "In Progress") return !t.done;
-            if (tab === "Completed") return t.done;
+            if (tab === "Pending") return t.status === "Pending";
+            if (tab === "Completed") return t.status === "Completed";
             return true;
         })
         .filter((t) => t.title.toLowerCase().includes(query.toLowerCase()))
-        .sort((a, b) =>
-            sort === "priority"
-                ? priorityRank[a.priority] - priorityRank[b.priority]
-                : b.progress - a.progress,
-        );
+        .sort((a, b) => {
+            const byDue =
+                a.dueDate.localeCompare(b.dueDate) ||
+                a.startTime.localeCompare(b.startTime);
+            return sort === "priority"
+                ? priorityRank[a.priority] - priorityRank[b.priority] || byDue
+                : byDue;
+        });
 
     const stats = {
         total: tasks.length,
-        inProgress: tasks.filter((t) => !t.done).length,
-        completed: tasks.filter((t) => t.done).length,
-        high: tasks.filter((t) => t.priority === "High" && !t.done).length,
+        pending: tasks.filter((t) => t.status === "Pending").length,
+        completed: tasks.filter((t) => t.status === "Completed").length,
+        high: tasks.filter(
+            (t) => t.priority === "High" && t.status === "Pending",
+        ).length,
     };
 
     return (
@@ -461,7 +311,7 @@ export default function TodoPage() {
             <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                 <div>
                     <h2 className="font-display text-3xl font-bold text-ink">
-                        To Do
+                        {isPersonal ? "To Do" : "Projects & Tasks"}
                     </h2>
                     <p className="mt-1 text-sm font-medium text-muted">
                         Manage your tasks and stay on track
@@ -485,8 +335,8 @@ export default function TodoPage() {
                     Icon={ListIcon}
                 />
                 <SummaryCard
-                    label="In Progress"
-                    value={stats.inProgress}
+                    label="Pending"
+                    value={stats.pending}
                     accent="brand"
                     Icon={ClockIcon}
                 />
@@ -545,7 +395,7 @@ export default function TodoPage() {
                         className="rounded-full border border-hairline bg-white px-4 py-2.5 text-sm font-medium text-ink outline-none transition focus:border-brand"
                     >
                         <option value="priority">Sort: Priority</option>
-                        <option value="progress">Sort: Progress</option>
+                        <option value="due">Sort: Due date</option>
                     </select>
                 </div>
             </div>
@@ -556,8 +406,8 @@ export default function TodoPage() {
                     <TaskItem
                         key={task.id}
                         task={task}
-                        onToggle={toggle}
-                        onDelete={remove}
+                        onToggle={toggleTask}
+                        onDelete={deleteTask}
                     />
                 ))}
                 {filtered.length === 0 && (
@@ -567,12 +417,7 @@ export default function TodoPage() {
                 )}
             </div>
 
-            {modalOpen && (
-                <AddTaskModal
-                    onClose={() => setModalOpen(false)}
-                    onSave={save}
-                />
-            )}
+            {modalOpen && <AddTaskModal onClose={() => setModalOpen(false)} />}
         </div>
     );
 }

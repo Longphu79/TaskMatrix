@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { useAuth } from "../../../assets/context/AuthContext";
-import { useTheme } from "../../../assets/context/ThemeContext";
+import { useAuth } from "../../../context/AuthContext";
+import { useTheme } from "../../../context/ThemeContext";
 import {
     AuthHero,
     GoogleIcon,
@@ -10,7 +10,7 @@ import {
     CheckboxButton,
     SocialButton,
     Spinner,
-} from "../../../assets/components/AuthShared";
+} from "../../../components/AuthShared";
 
 export default function LoginPage() {
     const navigate = useNavigate();

@@ -6,7 +6,7 @@ import {
     FolderIcon,
     MoreIcon,
     ChevronDownIcon,
-} from "../assets/components/icon";
+} from "../components/icon";
 
 /* ---------- data ---------- */
 

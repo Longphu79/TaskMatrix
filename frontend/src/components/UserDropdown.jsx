@@ -266,7 +266,7 @@ export default function UserDropdown() {
                             onClick={() => {
                                 logout();
                                 setOpen(false);
-                                navigate("/");
+                                navigate("/landing");
                             }}
                             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#e05656] transition hover:bg-[#fdecec]"
                         >

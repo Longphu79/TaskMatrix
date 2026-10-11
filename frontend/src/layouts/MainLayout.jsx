@@ -1,76 +1,14 @@
 import { useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import {
-    GridIcon,
-    ChartIcon,
-    ClockIcon,
-    ListIcon,
-    FileIcon,
-    SettingsIcon,
-    BellIcon,
-    SearchIcon,
-    ChevronDownIcon,
-    MenuIcon,
-} from "../assets/components/icon";
-import UserDropdown from "../assets/components/UserDropdown";
-
-/* Icon Bong bóng Chat dành riêng cho mục Chat */
-function ChatIcon({ width = 20, height = 20, className = "" }) {
-    return (
-        <svg
-            width={width}
-            height={height}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={className}
-        >
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        </svg>
-    );
-}
-
-const NAV = [
-    {
-        key: "dashboard",
-        label: "Dashboard",
-        path: "/dashboard",
-        Icon: GridIcon,
-    },
-    {
-        key: "analytic",
-        label: "Analytics",
-        path: "/analytics",
-        Icon: ChartIcon,
-    },
-    {
-        key: "timesheets",
-        label: "Timesheets",
-        path: "/timesheets",
-        Icon: ClockIcon,
-    },
-    { key: "todo", label: "Todo List", path: "/todo", Icon: ListIcon },
-    { key: "report", label: "Reports", path: "/report", Icon: FileIcon },
-    {
-        key: "chat",
-        label: "Team Chat",
-        path: "/chat",
-        Icon: ChatIcon,
-    },
-    {
-        key: "settings",
-        label: "Settings",
-        path: "/settings",
-        Icon: SettingsIcon,
-    },
-];
+import { BellIcon, SearchIcon, MenuIcon } from "../components/icon";
+import UserDropdown from "../components/UserDropdown"; // Hoặc đường dẫn UserDropdown của bạn
+import WorkspaceSwitcher from "../components/WorkspaceSwitcher"; // Hoặc đường dẫn WorkspaceSwitcher của bạn
+import { useWorkspace } from "../context/WorkspaceContext"; // Hoặc đường dẫn WorkspaceContext của bạn
 
 function Sidebar({ open, onClose }) {
     const navigate = useNavigate();
     const location = useLocation();
+    const { navigation } = useWorkspace(); // Lấy danh sách menu động theo Workspace
 
     return (
         <>
@@ -92,13 +30,13 @@ function Sidebar({ open, onClose }) {
                     </span>
                 </div>
 
-                {/* Danh sách Điều hướng */}
-                <nav className="flex flex-1 flex-col gap-1.5">
-                    {NAV.map(({ key, label, path, Icon }) => {
+                {/* Danh sách Điều hướng Động từ Context */}
+                <nav className="flex flex-1 flex-col gap-1.5 overflow-y-auto">
+                    {navigation.map(({ path, label, Icon }) => {
                         const isActive = location.pathname === path;
                         return (
                             <button
-                                key={key}
+                                key={path}
                                 onClick={() => {
                                     navigate(path);
                                     onClose();
@@ -124,19 +62,9 @@ function Sidebar({ open, onClose }) {
                     })}
                 </nav>
 
-                {/* Thông tin Công ty */}
-                <div className="mt-6">
-                    <span className="mb-2 block px-1 text-xs font-medium text-muted">
-                        Company
-                    </span>
-                    <button className="flex w-full items-center justify-between rounded-2xl border border-hairline px-4 py-3 text-sm font-medium text-ink transition hover:border-brand dark:border-slate-800 dark:text-white dark:hover:border-brand">
-                        Matrix Domain
-                        <ChevronDownIcon
-                            width={16}
-                            height={16}
-                            className="text-muted"
-                        />
-                    </button>
+                {/* Bộ chuyển đổi Workspace ở góc dưới cùng */}
+                <div className="mt-auto pt-4">
+                    <WorkspaceSwitcher onSwitch={onClose} />
                 </div>
             </aside>
         </>
@@ -147,8 +75,10 @@ function Topbar({ onMenu }) {
     const [query, setQuery] = useState("");
     const navigate = useNavigate();
     const location = useLocation();
+    const { navigation } = useWorkspace();
 
-    const currentNav = NAV.find((n) => n.path === location.pathname);
+    // Tiêu đề trang tự động khớp theo Route hiện tại
+    const currentNav = navigation.find((n) => n.path === location.pathname);
     const title = currentNav ? currentNav.label : "Dashboard";
 
     return (
