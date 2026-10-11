@@ -1,0 +1,42 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "TaskMatrix API",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build TaskMatrix API",
+      "program": "${workspaceFolder}/backend/TaskMatrix.Api/bin/Debug/net9.0/TaskMatrix.Api.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/backend/TaskMatrix.Api",
+      "stopAtEntry": false,
+      "console": "integratedTerminal",
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5045",
+        "MongoDbSettings__ConnectionString": "mongodb://localhost:27017",
+        "MongoDbSettings__DatabaseName": "TaskMatrix",
+        "Jwt__Key": "local-development-key-change-me-32chars",
+        "Jwt__Issuer": "TaskMatrix",
+        "Jwt__Audience": "TaskMatrix"
+      }
+    },
+    {
+      "name": "TaskMatrix frontend",
+      "type": "pwa-chrome",
+      "request": "launch",
+      "preLaunchTask": "start TaskMatrix frontend",
+      "url": "http://127.0.0.1:5173",
+      "webRoot": "${workspaceFolder}/frontend"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "TaskMatrix (API + frontend)",
+      "configurations": [
+        "TaskMatrix API",
+        "TaskMatrix frontend"
+      ]
+    }
+  ]
+}
