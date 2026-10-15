@@ -13,9 +13,35 @@
   --color-hairline: #eef0f3;
 }
 
-html,
-body,
-#root {
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* === SỬA LỖI DARK MODE TƯƠNG PHẢN === */
+.dark {
+  --color-canvas: #0b0f19;       /* Nền trang tối đằm hơn */
+  --color-ink: #f8fafc;          /* Màu chữ chính */
+  --color-hairline: #1e293b;     /* Đường viền tối */
+  --color-brand-soft: #2a2415;   /* Nền vàng nhạt tối */
+  --color-muted: #94a3b8;        /* Chữ phụ */
+}
+
+/* Ép các ô Card màu trắng chuyển sang màu nền tối */
+.dark .bg-white {
+  background-color: #111827 !important;
+}
+
+/* Sửa lỗi nút & thẻ bg-ink bị trắng tinh làm chìm chữ */
+.dark .bg-ink {
+  background-color: #1f2937 !important;
+  color: #ffffff !important;
+}
+
+/* Sửa thanh Bottom Action Bar ở cuối trang Settings */
+.dark .bg-white\/80,
+.dark .bg-white\/90 {
+  background-color: rgba(17, 24, 39, 0.9) !important;
+}
+
+html, body, #root {
   height: 100%;
 }
 
@@ -24,24 +50,5 @@ body {
   color: var(--color-ink);
   background: var(--color-canvas);
   -webkit-font-smoothing: antialiased;
-}
-
-/* Hide scrollbars until scrolling */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-*:hover {
-  scrollbar-color: #d4d7de transparent;
-}
-*::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-*::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: 999px;
-}
-*:hover::-webkit-scrollbar-thumb {
-  background: #d4d7de;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
