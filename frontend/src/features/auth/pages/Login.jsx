@@ -1,7 +1,11 @@
 import { useState } from "react";
+
 import { useNavigate, Link } from "react-router-dom";
+
 import { useAuth } from "../../../context/AuthContext";
+
 import { useTheme } from "../../../context/ThemeContext";
+
 import {
     AuthHero,
     GoogleIcon,
@@ -14,19 +18,30 @@ import {
 
 export default function LoginPage() {
     const navigate = useNavigate();
+
     const { login } = useAuth();
+
     const { dark, toggleTheme } = useTheme();
+
     const [email, setEmail] = useState("");
+
     const [password, setPassword] = useState("");
+
     const [showPassword, setShowPassword] = useState(false);
+
     const [remember, setRemember] = useState(true);
+
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
         if (loading) return;
+
         setLoading(true);
+
         await login({ email, password });
+
         navigate("/dashboard", {
             state: { toast: "Welcome back to TASKMATRIX!" },
         });
@@ -34,8 +49,11 @@ export default function LoginPage() {
 
     const social = async (provider) => {
         if (loading) return;
+
         setLoading(true);
+
         await login({ email: `you@${provider}.com` });
+
         navigate("/dashboard", { state: { toast: "Signed in successfully!" } });
     };
 
@@ -44,6 +62,7 @@ export default function LoginPage() {
             <AuthHero tagline="Manage your workspace, track time & boost team productivity." />
 
             {/* right column — form */}
+
             <div className="relative flex items-center justify-center px-5 py-10 sm:px-10">
                 <button
                     onClick={toggleTheme}
@@ -65,6 +84,7 @@ export default function LoginPage() {
                         ) : (
                             <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
                         )}
+
                         {dark && (
                             <path d="M12 2v2m0 16v2M2 12h2m16 0h2m-3.5-6.5-1.4 1.4M6.9 17.1l-1.4 1.4m0-12.6 1.4 1.4m10.2 10.2 1.4 1.4" />
                         )}
@@ -80,6 +100,7 @@ export default function LoginPage() {
                     </Link>
 
                     {/* mobile logo */}
+
                     <div className="mb-6 lg:hidden">
                         <span className="font-display text-2xl font-bold tracking-tight text-ink">
                             TASK<span className="text-brand">Y.</span>
@@ -89,6 +110,7 @@ export default function LoginPage() {
                     <h1 className="font-display text-2xl font-bold text-ink">
                         Sign in to TASKMATRIX
                     </h1>
+
                     <p className="mt-1.5 text-sm text-muted">
                         Don&apos;t have an account?{" "}
                         <Link
@@ -105,6 +127,7 @@ export default function LoginPage() {
                             label="Google"
                             onClick={() => social("google")}
                         />
+
                         <SocialButton
                             icon={<GitHubIcon />}
                             label="GitHub"
@@ -114,9 +137,11 @@ export default function LoginPage() {
 
                     <div className="my-6 flex items-center gap-4">
                         <span className="h-px flex-1 bg-hairline" />
+
                         <span className="text-xs font-medium text-muted">
                             Or continue with email
                         </span>
+
                         <span className="h-px flex-1 bg-hairline" />
                     </div>
 
@@ -125,6 +150,7 @@ export default function LoginPage() {
                             <label className="mb-1.5 block text-sm font-medium text-ink">
                                 Email address
                             </label>
+
                             <input
                                 type="email"
                                 required
@@ -139,6 +165,7 @@ export default function LoginPage() {
                             <label className="mb-1.5 block text-sm font-medium text-ink">
                                 Password
                             </label>
+
                             <div className="relative">
                                 <input
                                     type={showPassword ? "text" : "password"}
@@ -150,6 +177,7 @@ export default function LoginPage() {
                                     placeholder="Enter your password"
                                     className="w-full rounded-xl border border-hairline bg-canvas px-4 py-3 pr-12 text-sm text-ink outline-none transition placeholder:text-muted focus:border-brand focus:bg-white"
                                 />
+
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword((s) => !s)}
@@ -173,6 +201,7 @@ export default function LoginPage() {
                                 />
                                 Remember me for 30 days
                             </label>
+
                             <button
                                 type="button"
                                 className="text-sm font-medium text-brand transition hover:underline"

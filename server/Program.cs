@@ -7,14 +7,15 @@ using TaskMatrix.Api.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Cấu hình MongoDB Connection
-builder.Services.AddSingleton<IMongoClient>(sp =>
-    new MongoClient(builder.Configuration.GetSection("MongoDbSettings:ConnectionString").Value));
+var mongoConnectionString = builder.Configuration["MongoDbSettings:ConnectionString"];
+var mongoDatabaseName = builder.Configuration["MongoDbSettings:DatabaseName"];
+
+builder.Services.AddSingleton<IMongoClient>(sp => new MongoClient(mongoConnectionString));
 
 builder.Services.AddScoped<IMongoDatabase>(sp =>
 {
     var client = sp.GetRequiredService<IMongoClient>();
-    var dbName = builder.Configuration.GetSection("MongoDbSettings:DatabaseName").Value;
-    return client.GetDatabase(dbName);
+    return client.GetDatabase(mongoDatabaseName);
 });
 
 // 2. Đăng ký các Business Services
@@ -23,7 +24,7 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<TaskService>();
 
 // 3. Cấu hình Xác thực JWT (Authentication)
-var jwtKey = builder.Configuration["Jwt:Key"]!;
+var jwtKey = builder.Configuration["Jwt:Key"] ?? "SuperSecretKeyForTaskMatrixApp2026";
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -39,7 +40,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-// 4. CORS cho phép React
+// 4. Cấu hình CORS cho phép React kết nối
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
@@ -60,10 +61,12 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// Bỏ/Comment dòng HTTPS Redirection nếu chạy HTTP Local Port 5260 để tránh bị chặn Request
+// app.UseHttpsRedirection();
+
 app.UseCors("AllowReactApp");
 
-// LƯU Ý: UseAuthentication phải đứng TRƯỚC UseAuthorization
+// Middleware xác thực & phân quyền (Đã đúng thứ tự)
 app.UseAuthentication();
 app.UseAuthorization();
 

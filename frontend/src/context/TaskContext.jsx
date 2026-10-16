@@ -1,202 +1,195 @@
 import {
     createContext,
-    useCallback,
     useContext,
-    useMemo,
     useState,
+    useEffect,
+    useCallback,
 } from "react";
-
-/* ---------- date / time helpers shared by pages ---------- */
-
-export function toISODate(date) {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-}
-
-// Parses "YYYY-MM-DD" as a local date (new Date(str) would parse as UTC).
-export function parseISODate(str) {
-    const [y, m, d] = str.split("-").map(Number);
-    return new Date(y, m - 1, d);
-}
-
-// "HH:MM" -> decimal hours. An end time of "00:00" is treated as midnight (24).
-export function timeToHours(time, { isEnd = false } = {}) {
-    const [h, m] = time.split(":").map(Number);
-    const hours = h + m / 60;
-    return isEnd && hours === 0 ? 24 : hours;
-}
-
-export function taskHours(task) {
-    return {
-        start: timeToHours(task.startTime),
-        end: timeToHours(task.endTime, { isEnd: true }),
-    };
-}
-
-/* ---------- seed data ---------- */
-
-function buildInitialTasks() {
-    const now = new Date();
-    const monday = new Date(now);
-    monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
-    const on = (offset) => {
-        const d = new Date(monday);
-        d.setDate(monday.getDate() + offset);
-        return toISODate(d);
-    };
-
-    return [
-        {
-            id: "t1",
-            title: "Creating Wireframe for Food Dashboard",
-            project: "Food Dashboard",
-            priority: "High",
-            dueDate: on(0),
-            startTime: "09:00",
-            endTime: "11:00",
-            status: "Completed",
-        },
-        {
-            id: "t2",
-            title: "Research & Development for new module",
-            project: "Matrix Domain",
-            priority: "Medium",
-            dueDate: on(1),
-            startTime: "10:00",
-            endTime: "12:30",
-            status: "Pending",
-        },
-        {
-            id: "t3",
-            title: "Prototype interaction states",
-            project: "Project Four",
-            priority: "High",
-            dueDate: on(2),
-            startTime: "13:00",
-            endTime: "15:30",
-            status: "Pending",
-        },
-        {
-            id: "t4",
-            title: "Prepare client review deck",
-            project: "Project Three",
-            priority: "Low",
-            dueDate: on(3),
-            startTime: "14:00",
-            endTime: "16:00",
-            status: "Pending",
-        },
-        {
-            id: "t5",
-            title: "Design QA and developer handoff",
-            project: "Food Dashboard",
-            priority: "Medium",
-            dueDate: on(3),
-            startTime: "15:00",
-            endTime: "17:00",
-            status: "Pending",
-        },
-        {
-            id: "t6",
-            title: "Finalize typography and color tokens",
-            project: "Matrix Domain",
-            priority: "Low",
-            dueDate: on(4),
-            startTime: "09:00",
-            endTime: "11:00",
-            status: "Pending",
-        },
-        {
-            id: "t7",
-            title: "Team sync and sprint planning",
-            project: "Project Three",
-            priority: "Medium",
-            dueDate: on(4),
-            startTime: "19:00",
-            endTime: "20:30",
-            status: "Pending",
-        },
-        {
-            id: "t8",
-            title: "Weekly retrospective",
-            project: "Matrix Domain",
-            priority: "Low",
-            dueDate: on(-3),
-            startTime: "16:00",
-            endTime: "17:00",
-            status: "Completed",
-        },
-        {
-            id: "t9",
-            title: "Usability testing session",
-            project: "Food Dashboard",
-            priority: "High",
-            dueDate: on(8),
-            startTime: "11:00",
-            endTime: "13:00",
-            status: "Pending",
-        },
-    ];
-}
-
-/* ---------- context ---------- */
+import apiClient from "../services/apiClient";
+import { useWorkspace } from "./WorkspaceContext";
 
 const TaskContext = createContext(null);
 
-export function TaskProvider({ children }) {
-    const [tasks, setTasks] = useState(buildInitialTasks);
+// Hàm chuẩn hóa dữ liệu (xử lý cả PascalCase lẫn camelCase từ .NET)
+function normalizeTask(t) {
+    if (!t) return null;
+    return {
+        id: t.id || t.Id || t._id,
+        userId: t.userId || t.UserId,
+        workspaceId: String(
+            t.workspaceId || t.WorkspaceId || "personal",
+        ).toLowerCase(),
+        title: t.title || t.Title || "",
+        description: t.description || t.Description || "",
+        priority: t.priority || t.Priority || "Medium",
+        status: t.status || t.Status || "Todo",
+        dueDate: t.dueDate || t.DueDate,
+        startTime: t.startTime || t.StartTime,
+        endTime: t.endTime || t.EndTime,
+        createdAt: t.createdAt || t.CreatedAt,
+    };
+}
 
-    const addTask = useCallback((input) => {
-        const task = {
-            id:
-                globalThis.crypto?.randomUUID?.() ??
-                `t${Date.now()}${Math.random()}`,
-            title: input.title.trim(),
-            project: input.project?.trim() || "General",
-            priority: input.priority ?? "Medium",
-            dueDate: input.dueDate,
-            startTime: input.startTime ?? "09:00",
-            endTime: input.endTime ?? "11:00",
-            status: "Pending",
-        };
-        setTasks((prev) => [task, ...prev]);
-        return task;
+export function TaskProvider({ children }) {
+    const { currentWorkspace } = useWorkspace();
+    const [tasks, setTasks] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    // 1. Lấy danh sách Tasks từ DB
+    const fetchTasks = useCallback(async () => {
+        setLoading(true);
+        try {
+            // apiClient đã unwrap sẵn response.data, nên res ở đây chính là Array
+            const res = await apiClient.get("/tasks");
+            const rawList = Array.isArray(res) ? res : [];
+
+            const cleanTasks = rawList.map(normalizeTask).filter(Boolean);
+            console.log("Tasks từ DB sau khi chuẩn hóa:", cleanTasks);
+            setTasks(cleanTasks);
+        } catch (err) {
+            console.error("Lỗi khi tải danh sách Tasks từ DB:", err);
+            setTasks([]);
+        } finally {
+            setLoading(false);
+        }
     }, []);
 
-    const toggleTask = useCallback((id) => {
+    useEffect(() => {
+        fetchTasks();
+    }, [fetchTasks, currentWorkspace?.id]);
+
+    // 2. Thêm Task mới
+    const addTask = async (formData) => {
+        try {
+            const dueISO = formData.dueDate
+                ? new Date(formData.dueDate).toISOString()
+                : new Date().toISOString();
+
+            const startISO =
+                formData.startTime && formData.dueDate
+                    ? new Date(
+                          `${formData.dueDate}T${formData.startTime}:00Z`,
+                      ).toISOString()
+                    : null;
+
+            const endISO =
+                formData.endTime && formData.dueDate
+                    ? new Date(
+                          `${formData.dueDate}T${formData.endTime}:00Z`,
+                      ).toISOString()
+                    : null;
+
+            const payload = {
+                title: formData.title,
+                description: formData.project
+                    ? `Project: ${formData.project}`
+                    : "",
+                priority: formData.priority || "Medium",
+                status: "Todo",
+                dueDate: dueISO,
+                startTime: startISO,
+                endTime: endISO,
+                workspaceId: currentWorkspace?.id || "personal",
+            };
+
+            // res ở đây chính là object Task vừa tạo
+            const createdData = await apiClient.post("/tasks", payload);
+
+            if (createdData) {
+                const newTask = normalizeTask(createdData);
+                setTasks((prev) => [newTask, ...prev.filter(Boolean)]);
+                return newTask;
+            }
+        } catch (err) {
+            console.error("Lỗi khi thêm Task:", err);
+            throw err;
+        }
+    };
+
+    // 3. Toggle trạng thái
+    const toggleTask = async (taskId) => {
+        const target = tasks.find((t) => t?.id === taskId);
+        if (!target) return;
+
+        const newStatus = target.status === "Completed" ? "Todo" : "Completed";
+
         setTasks((prev) =>
             prev.map((t) =>
-                t.id === id
-                    ? {
-                          ...t,
-                          status:
-                              t.status === "Completed"
-                                  ? "Pending"
-                                  : "Completed",
-                      }
-                    : t,
+                t?.id === taskId ? { ...t, status: newStatus } : t,
             ),
         );
-    }, []);
 
-    const deleteTask = useCallback((id) => {
-        setTasks((prev) => prev.filter((t) => t.id !== id));
-    }, []);
+        try {
+            await apiClient.put(`/tasks/${taskId}`, {
+                ...target,
+                status: newStatus,
+            });
+        } catch (err) {
+            console.error("Lỗi cập nhật Task:", err);
+            fetchTasks();
+        }
+    };
 
-    const value = useMemo(
-        () => ({ tasks, addTask, toggleTask, deleteTask }),
-        [tasks, addTask, toggleTask, deleteTask],
-    );
+    // 4. Xóa Task
+    const deleteTask = async (taskId) => {
+        setTasks((prev) => prev.filter((t) => t?.id !== taskId));
+        try {
+            await apiClient.delete(`/tasks/${taskId}`);
+        } catch (err) {
+            console.error("Lỗi xóa Task:", err);
+            fetchTasks();
+        }
+    };
 
     return (
-        <TaskContext.Provider value={value}>{children}</TaskContext.Provider>
+        <TaskContext.Provider
+            value={{
+                tasks,
+                loading,
+                fetchTasks,
+                addTask,
+                toggleTask,
+                deleteTask,
+            }}
+        >
+            {children}
+        </TaskContext.Provider>
     );
 }
 
 export function useTasks() {
-    const ctx = useContext(TaskContext);
-    if (!ctx) throw new Error("useTasks must be used within a TaskProvider");
-    return ctx;
+    const context = useContext(TaskContext);
+    if (!context) {
+        throw new Error("useTasks must be used within TaskProvider");
+    }
+    return context;
+}
+
+export function parseISODate(iso) {
+    if (!iso) return new Date();
+    return new Date(iso);
+}
+
+export function taskHours(task) {
+    if (task?.startTime && task?.endTime) {
+        const s = new Date(task.startTime);
+        const e = new Date(task.endTime);
+        const start = s.getHours() + s.getMinutes() / 60;
+        const end = e.getHours() + e.getMinutes() / 60;
+        return { start, end };
+    }
+    return { start: 8, end: 10 };
+}
+
+export function toISODate(date) {
+    if (!date) return new Date().toISOString().split("T")[0];
+    const d = new Date(date);
+    return d.toISOString().split("T")[0];
+}
+
+export function timeToHours(timeStr, options = {}) {
+    if (!timeStr) return 0;
+    const [h, m] = timeStr.split(":").map(Number);
+    const total = h + (m || 0) / 60;
+    return options.isEnd && total === 0 ? 24 : total;
 }

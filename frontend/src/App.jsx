@@ -11,8 +11,8 @@ import MainLayout from "./layouts/MainLayout";
 // Pages
 import Dashboard from "./pages/dashboard";
 import AnalyticsPage from "./pages/Analytics";
-import TimesheetsPage from "./pages/Timesheets";
-import TodoPage from "./pages/Todo";
+import TimesheetsPage from "./features/Task/pages/Timesheets";
+import TodoPage from "./features/Task/pages/Todo";
 import ReportPage from "./pages/Report";
 import SettingsPage from "./pages/Settings";
 import ChatPage from "./pages/Chat";
