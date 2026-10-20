@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useWorkspace } from "../../../context/WorkspaceContext"; // Tích hợp Workspace
 import {
     useTasks,
     toISODate,
@@ -56,11 +57,23 @@ function formatHour(h) {
     const hr = h % 12 === 0 ? 12 : h % 12;
     return `${String(hr).padStart(2, "0")}:00 ${h % 24 < 12 ? "AM" : "PM"}`;
 }
+
+// Xử lý an toàn cả Time string lẫn ISO DateTime từ MongoDB
 function format12(time) {
-    const [h, m] = time.split(":").map(Number);
+    if (!time) return "--:--";
+    if (typeof time === "string" && time.includes("T")) {
+        const d = new Date(time);
+        return d.toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+    }
+    const [h, m] = String(time).split(":").map(Number);
+    if (isNaN(h)) return time;
     const hr = h % 12 === 0 ? 12 : h % 12;
-    return `${String(hr).padStart(2, "0")}:${String(m).padStart(2, "0")} ${h % 24 < 12 ? "AM" : "PM"}`;
+    return `${String(hr).padStart(2, "0")}:${String(m || 0).padStart(2, "0")} ${h % 24 < 12 ? "AM" : "PM"}`;
 }
+
 function taskMinutes(task) {
     const { start, end } = taskHours(task);
     return Math.round((end - start) * 60);
@@ -91,28 +104,34 @@ const CHIP = {
 };
 const COLOR_KEYS = Object.keys(COLORS);
 
-// Stable color per project so a project always looks the same across views.
-function colorForProject(project) {
+function colorForProject(projectStr) {
+    const proj = projectStr || "General";
     let hash = 0;
-    for (const ch of project) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+    for (const ch of proj) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
     return COLOR_KEYS[hash % COLOR_KEYS.length];
 }
 
 /* ---------- task selectors ---------- */
 
+// Chuẩn hóa key dueDate bằng toISODate() để khớp chính xác
 function groupByDate(tasks) {
     const map = new Map();
     for (const t of tasks) {
-        if (!map.has(t.dueDate)) map.set(t.dueDate, []);
-        map.get(t.dueDate).push(t);
+        if (!t || !t.dueDate) continue;
+        const key = toISODate(t.dueDate);
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(t);
     }
     for (const list of map.values()) {
-        list.sort((a, b) => a.startTime.localeCompare(b.startTime));
+        list.sort((a, b) => {
+            const aTime = String(a.startTime || "");
+            const bTime = String(b.startTime || "");
+            return aTime.localeCompare(bTime);
+        });
     }
     return map;
 }
 
-// Clips tasks to the visible grid and assigns side-by-side columns to overlaps.
 function layoutDay(dayTasks) {
     const items = dayTasks
         .map((task) => {
@@ -170,12 +189,12 @@ function SummaryCards({ tasks, scope }) {
             {cards.map((c) => (
                 <div
                     key={c.label}
-                    className="rounded-3xl bg-white p-6 shadow-[0_8px_30px_rgba(17,17,26,0.04)] dark:border dark:border-slate-700/50"
+                    className="rounded-3xl bg-white p-6 shadow-[0_8px_30px_rgba(17,17,26,0.04)] dark:bg-slate-900 dark:border dark:border-slate-700/50"
                 >
                     <div className="text-sm font-medium text-muted">
                         {c.label}
                     </div>
-                    <div className="mt-3 font-display text-3xl font-bold text-ink">
+                    <div className="mt-3 font-display text-3xl font-bold text-ink dark:text-white">
                         {c.value}
                     </div>
                 </div>
@@ -193,7 +212,7 @@ function WeekView({ weekStart, byDate, onSelectDay }) {
     const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
     return (
-        <div className="overflow-x-auto rounded-3xl bg-white p-4 shadow-[0_8px_30px_rgba(17,17,26,0.04)] dark:border dark:border-slate-700/50 sm:p-6">
+        <div className="overflow-x-auto rounded-3xl bg-white p-4 shadow-[0_8px_30px_rgba(17,17,26,0.04)] dark:bg-slate-900 dark:border dark:border-slate-700/50 sm:p-6">
             <div className="min-w-[720px]">
                 <div className="flex">
                     <div className="w-16 shrink-0" />
@@ -259,7 +278,7 @@ function WeekView({ weekStart, byDate, onSelectDay }) {
                                 {placed.map(
                                     ({ task, start, end, col, cols }) => (
                                         <button
-                                            key={task.id}
+                                            key={task.id || task._id}
                                             type="button"
                                             onClick={() => onSelectDay(d)}
                                             title={`${task.title} · ${format12(task.startTime)} – ${format12(task.endTime)}`}
@@ -277,17 +296,14 @@ function WeekView({ weekStart, byDate, onSelectDay }) {
                                             className={`overflow-hidden rounded-xl border-l-4 px-2.5 py-1.5 text-left transition hover:shadow-md ${
                                                 COLORS[
                                                     colorForProject(
-                                                        task.project,
+                                                        task.project ||
+                                                            task.workspaceId,
                                                     )
                                                 ]
                                             } ${task.status === "Completed" ? "opacity-60" : ""}`}
                                         >
                                             <div
-                                                className={`truncate text-xs font-semibold ${
-                                                    task.status === "Completed"
-                                                        ? "line-through"
-                                                        : ""
-                                                }`}
+                                                className={`truncate text-xs font-semibold ${task.status === "Completed" ? "line-through" : ""}`}
                                             >
                                                 {task.title}
                                             </div>
@@ -316,7 +332,7 @@ function MonthView({ anchor, byDate, onSelectDay }) {
     const cells = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
 
     return (
-        <div className="rounded-3xl bg-white p-4 shadow-[0_8px_30px_rgba(17,17,26,0.04)] dark:border dark:border-slate-700/50 sm:p-6">
+        <div className="rounded-3xl bg-white p-4 shadow-[0_8px_30px_rgba(17,17,26,0.04)] dark:bg-slate-900 dark:border dark:border-slate-700/50 sm:p-6">
             <div className="mb-2 grid grid-cols-7 gap-2">
                 {DAY_NAMES.map((d) => (
                     <div
@@ -337,6 +353,7 @@ function MonthView({ anchor, byDate, onSelectDay }) {
                         (sum, t) => sum + taskMinutes(t),
                         0,
                     );
+
                     return (
                         <div
                             key={i}
@@ -345,11 +362,11 @@ function MonthView({ anchor, byDate, onSelectDay }) {
                                 isToday
                                     ? "border-brand bg-brand/10"
                                     : "border-hairline dark:border-slate-700/50"
-                            } ${inMonth ? "bg-white" : "bg-canvas/60 dark:bg-slate-800/40"}`}
+                            } ${inMonth ? "bg-white dark:bg-slate-900" : "bg-canvas/60 dark:bg-slate-800/40"}`}
                         >
                             <div className="flex items-center justify-between">
                                 <span
-                                    className={`text-sm font-semibold ${inMonth ? "text-ink" : "text-muted"} ${
+                                    className={`text-sm font-semibold ${inMonth ? "text-ink dark:text-white" : "text-muted"} ${
                                         isToday
                                             ? "flex h-6 w-6 items-center justify-center rounded-full bg-brand text-ink"
                                             : ""
@@ -368,7 +385,7 @@ function MonthView({ anchor, byDate, onSelectDay }) {
                                 <div className="mt-2 space-y-1">
                                     {dayTasks.slice(0, 2).map((t) => (
                                         <div
-                                            key={t.id}
+                                            key={t.id || t._id}
                                             className={`truncate rounded-md bg-canvas px-1.5 py-0.5 text-[10px] font-medium text-ink dark:bg-slate-700/50 dark:text-slate-200 ${
                                                 t.status === "Completed"
                                                     ? "line-through opacity-60"
@@ -489,44 +506,37 @@ function DayDetailModal({ date, tasks, onToggle, onDelete, onAdd, onClose }) {
                     ) : (
                         tasks.map((t) => {
                             const done = t.status === "Completed";
+                            const taskId = t.id || t._id;
                             return (
                                 <div
-                                    key={t.id}
+                                    key={taskId}
                                     className="rounded-2xl border border-hairline p-4 transition hover:border-brand dark:border-slate-700 dark:bg-slate-800"
                                 >
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0">
                                             <div
-                                                className={`truncate text-sm font-semibold text-ink dark:text-white ${
-                                                    done
-                                                        ? "line-through opacity-60"
-                                                        : ""
-                                                }`}
+                                                className={`truncate text-sm font-semibold text-ink dark:text-white ${done ? "line-through opacity-60" : ""}`}
                                             >
                                                 {t.title}
                                             </div>
                                             <span
-                                                className={`mt-1.5 inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold ${CHIP[colorForProject(t.project)]}`}
+                                                className={`mt-1.5 inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold ${CHIP[colorForProject(t.project || t.workspaceId)]}`}
                                             >
-                                                {t.project}
+                                                {t.project ||
+                                                    t.workspaceId ||
+                                                    "General"}
                                             </span>
                                         </div>
                                         <div className="flex shrink-0 gap-1">
                                             <button
-                                                onClick={() => onToggle(t.id)}
+                                                onClick={() => onToggle(taskId)}
                                                 className="rounded-lg p-1.5 text-muted transition hover:bg-canvas hover:text-ink dark:hover:bg-slate-700 dark:hover:text-white"
-                                                aria-label={
-                                                    done
-                                                        ? "Mark pending"
-                                                        : "Mark completed"
-                                                }
                                             >
                                                 <CheckIcon />
                                             </button>
                                             <button
-                                                onClick={() => onDelete(t.id)}
+                                                onClick={() => onDelete(taskId)}
                                                 className="rounded-lg p-1.5 text-muted transition hover:bg-[#fdecec] hover:text-[#e05656] dark:hover:bg-rose-500/15"
-                                                aria-label="Delete task"
                                             >
                                                 <TrashIcon />
                                             </button>
@@ -542,15 +552,6 @@ function DayDetailModal({ date, tasks, onToggle, onDelete, onAdd, onClose }) {
                                             {fmtDuration(taskMinutes(t))}
                                         </span>
                                         <span>{t.priority} priority</span>
-                                        <span
-                                            className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                                                done
-                                                    ? "bg-[#e8f5ef] text-[#3fb27f] dark:bg-emerald-500/15 dark:text-emerald-300"
-                                                    : "bg-brand-soft text-ink dark:bg-brand/15 dark:text-brand"
-                                            }`}
-                                        >
-                                            {t.status}
-                                        </span>
                                     </div>
                                 </div>
                             );
@@ -571,28 +572,52 @@ function DayDetailModal({ date, tasks, onToggle, onDelete, onAdd, onClose }) {
     );
 }
 
-/* ---------- page ---------- */
+/* ---------- main page ---------- */
 
 export default function TimesheetsPage() {
-    const { tasks, toggleTask, deleteTask } = useTasks();
+    const { isPersonal, currentWorkspace } = useWorkspace(); // Lấy workspace hiện tại
+    const { tasks = [], toggleTask, deleteTask } = useTasks();
     const [view, setView] = useState("week");
     const [anchor, setAnchor] = useState(() => new Date());
     const [selectedDay, setSelectedDay] = useState(null);
-    const [addDate, setAddDate] = useState(null); // ISO date string while the modal is open
+    const [addDate, setAddDate] = useState(null);
+
+    // Lọc Task theo Workspace (Cá nhân vs Công ty)
+    const workspaceTasks = useMemo(() => {
+        return (tasks || []).filter((t) => {
+            if (!t) return false;
+            if (!t.workspaceId) return true;
+            if (currentWorkspace?.id) {
+                const targetWs = String(t.workspaceId).toLowerCase();
+                const activeWs = String(currentWorkspace.id).toLowerCase();
+                return (
+                    targetWs === activeWs ||
+                    activeWs === "personal" ||
+                    targetWs === "personal"
+                );
+            }
+            return true;
+        });
+    }, [tasks, currentWorkspace]);
 
     const weekStart = useMemo(() => startOfWeek(anchor), [anchor]);
-    const byDate = useMemo(() => groupByDate(tasks), [tasks]);
+    const byDate = useMemo(() => groupByDate(workspaceTasks), [workspaceTasks]);
 
-    // Tasks inside the visible range, used for the summary cards.
+    // Lọc Task nằm trong khoảng Tuần hoặc Tháng đang xem
     const rangeTasks = useMemo(() => {
         if (view === "week") {
             const from = toISODate(weekStart);
             const to = toISODate(addDays(weekStart, 6));
-            return tasks.filter((t) => t.dueDate >= from && t.dueDate <= to);
+            return workspaceTasks.filter((t) => {
+                const d = toISODate(t.dueDate);
+                return d >= from && d <= to;
+            });
         }
         const prefix = `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, "0")}`;
-        return tasks.filter((t) => t.dueDate.startsWith(prefix));
-    }, [tasks, view, weekStart, anchor]);
+        return workspaceTasks.filter((t) =>
+            toISODate(t.dueDate).startsWith(prefix),
+        );
+    }, [workspaceTasks, view, weekStart, anchor]);
 
     const title = useMemo(() => {
         if (view === "week") {
@@ -611,11 +636,13 @@ export default function TimesheetsPage() {
         <div className="px-5 pb-8 lg:px-8">
             <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                 <div>
-                    <h2 className="font-display text-3xl font-bold text-ink">
+                    <h2 className="font-display text-3xl font-bold text-ink dark:text-white">
                         Timesheets
                     </h2>
                     <p className="mt-1 text-sm font-medium text-muted">
-                        Your weekly and monthly schedule at a glance
+                        {isPersonal
+                            ? "Personal Schedule"
+                            : `${currentWorkspace?.name || "Project"} Schedule`}
                     </p>
                 </div>
                 <button
@@ -635,30 +662,30 @@ export default function TimesheetsPage() {
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => go(-1)}
-                        className="rounded-xl border border-hairline bg-white px-3 py-2 text-sm font-medium text-ink transition hover:border-brand dark:border-slate-700/50"
+                        className="rounded-xl border border-hairline bg-white px-3 py-2 text-sm font-medium text-ink transition hover:border-brand dark:bg-slate-900 dark:border-slate-700/50 dark:text-white"
                         aria-label="Previous"
                     >
                         ←
                     </button>
                     <button
                         onClick={() => setAnchor(new Date())}
-                        className="rounded-xl border border-hairline bg-white px-4 py-2 text-sm font-medium text-ink transition hover:border-brand dark:border-slate-700/50"
+                        className="rounded-xl border border-hairline bg-white px-4 py-2 text-sm font-medium text-ink transition hover:border-brand dark:bg-slate-900 dark:border-slate-700/50 dark:text-white"
                     >
                         Today
                     </button>
                     <button
                         onClick={() => go(1)}
-                        className="rounded-xl border border-hairline bg-white px-3 py-2 text-sm font-medium text-ink transition hover:border-brand dark:border-slate-700/50"
+                        className="rounded-xl border border-hairline bg-white px-3 py-2 text-sm font-medium text-ink transition hover:border-brand dark:bg-slate-900 dark:border-slate-700/50 dark:text-white"
                         aria-label="Next"
                     >
                         →
                     </button>
-                    <span className="ml-2 font-display text-base font-semibold text-ink">
+                    <span className="ml-2 font-display text-base font-semibold text-ink dark:text-white">
                         {title}
                     </span>
                 </div>
 
-                <div className="flex gap-1 rounded-xl bg-white p-1 shadow-[0_8px_30px_rgba(17,17,26,0.04)] dark:border dark:border-slate-700/50">
+                <div className="flex gap-1 rounded-xl bg-white p-1 shadow-[0_8px_30px_rgba(17,17,26,0.04)] dark:bg-slate-900 dark:border dark:border-slate-700/50">
                     {["week", "month"].map((v) => (
                         <button
                             key={v}
@@ -666,7 +693,7 @@ export default function TimesheetsPage() {
                             className={`rounded-lg px-4 py-2 text-sm font-medium capitalize transition ${
                                 view === v
                                     ? "bg-ink text-white dark:!bg-brand dark:!text-slate-900"
-                                    : "text-muted hover:text-ink"
+                                    : "text-muted hover:text-ink dark:hover:text-white"
                             }`}
                         >
                             {v}

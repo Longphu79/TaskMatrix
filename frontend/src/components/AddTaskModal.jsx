@@ -1,9 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-    toISODate,
-    timeToHours,
-    useTasks,
-} from "../context/TaskContext";
+import { toISODate, timeToHours, useTasks } from "../context/TaskContext";
 
 const INPUT_CLS =
     "w-full rounded-xl border border-hairline bg-white px-4 py-2.5 text-sm text-ink outline-none transition placeholder:text-muted focus:border-brand dark:bg-slate-800 dark:border-slate-700/50 dark:text-white";
@@ -33,9 +29,13 @@ export default function AddTaskModal({ onClose, defaultDate, onAdded }) {
         endTime: "11:00",
     });
     const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
 
     const projects = useMemo(
-        () => [...new Set(tasks.map((t) => t.project))].sort(),
+        () =>
+            [...new Set(tasks.map((t) => t.project || t.workspaceId))]
+                .filter(Boolean)
+                .sort(),
         [tasks],
     );
 
@@ -44,7 +44,7 @@ export default function AddTaskModal({ onClose, defaultDate, onAdded }) {
         setError("");
     };
 
-    const submit = (e) => {
+    const submit = async (e) => {
         e.preventDefault();
         if (!form.title.trim()) return setError("Please enter a task title.");
         if (!form.dueDate) return setError("Please choose a due date.");
@@ -57,9 +57,18 @@ export default function AddTaskModal({ onClose, defaultDate, onAdded }) {
             return setError("End time must be after start time.");
         }
 
-        const task = addTask(form);
-        onAdded?.(task);
-        onClose();
+        setLoading(true);
+        try {
+            // Gọi hàm addTask từ TaskContext (Đã dùng Axios gửi API POST)
+            const createdTask = await addTask(form);
+            onAdded?.(createdTask);
+            onClose();
+        } catch (err) {
+            console.error("Failed to add task:", err);
+            setError("Lỗi kết nối Server hoặc không thể tạo task.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -73,12 +82,12 @@ export default function AddTaskModal({ onClose, defaultDate, onAdded }) {
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="add-task-title"
-                className="max-h-full w-full max-w-md overflow-y-auto rounded-3xl bg-white p-7 shadow-2xl dark:border dark:border-slate-700/50"
+                className="max-h-full w-full max-w-md overflow-y-auto rounded-3xl bg-white p-7 shadow-2xl dark:border dark:border-slate-700/50 dark:bg-slate-900"
             >
                 <div className="mb-6 flex items-center justify-between">
                     <h3
                         id="add-task-title"
-                        className="font-display text-xl font-bold text-ink"
+                        className="font-display text-xl font-bold text-ink dark:text-white"
                     >
                         Add Task
                     </h3>
@@ -86,7 +95,7 @@ export default function AddTaskModal({ onClose, defaultDate, onAdded }) {
                         type="button"
                         onClick={onClose}
                         aria-label="Close"
-                        className="rounded-lg p-1 text-muted transition hover:bg-canvas hover:text-ink"
+                        className="rounded-lg p-1 text-muted transition hover:bg-canvas hover:text-ink dark:hover:bg-slate-800 dark:hover:text-white"
                     >
                         <svg
                             width="20"
@@ -191,15 +200,16 @@ export default function AddTaskModal({ onClose, defaultDate, onAdded }) {
                     <button
                         type="button"
                         onClick={onClose}
-                        className="rounded-xl border border-hairline px-5 py-2.5 text-sm font-medium text-muted transition hover:text-ink"
+                        className="rounded-xl border border-hairline px-5 py-2.5 text-sm font-medium text-muted transition hover:text-ink dark:border-slate-700 dark:hover:text-white"
                     >
                         Cancel
                     </button>
                     <button
                         type="submit"
-                        className="rounded-xl bg-ink px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-black dark:!bg-brand dark:!text-slate-900"
+                        disabled={loading}
+                        className="rounded-xl bg-ink px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-black dark:!bg-brand dark:!text-slate-900 disabled:opacity-50"
                     >
-                        Add Task
+                        {loading ? "Adding..." : "Add Task"}
                     </button>
                 </div>
             </form>

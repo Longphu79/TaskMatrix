@@ -173,7 +173,7 @@ export function WorkspaceProvider({ children }) {
                             },
                             {
                                 path: "/settings",
-                                label: "Company Settings",
+                                label: "Project Settings",
                                 Icon: SettingsIcon,
                             },
                         ]
