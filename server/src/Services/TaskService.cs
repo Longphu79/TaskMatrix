@@ -31,7 +31,12 @@ public class TaskService
 
         return tasks;
     }
-
+    // Thêm hàm này vào class TaskService của bạn
+    public async Task<TaskItem?> GetTaskByIdAsync(string id)
+    {
+        return await _tasks.Find(t => t.Id == id).FirstOrDefaultAsync();
+    }
+    
     // 2. Tạo mới Task
     public async Task<TaskItem> CreateTaskAsync(string userId, TaskItem task)
     {

@@ -58,9 +58,16 @@ public class TaskItem
     [BsonElement("actualMinutes")]
     public int ActualMinutes { get; set; } = 0;
 
+    // --- BACKGROUND WORKER NOTIFICATIONS ---
+    [BsonElement("isReminderSent")]
+    public bool IsReminderSent { get; set; } = false;
+
     // --- BẰNG CHỨNG CÔNG VIỆC (AI AGENT VERIFICATION) ---
     [BsonElement("proofImageUrl")]
     public string? ProofImageUrl { get; set; }
+
+    [BsonElement("aiVerificationReason")]
+    public string? AiVerificationReason { get; set; }
 
     // --- TIMESTAMPS ---
     [BsonElement("createdAt")]

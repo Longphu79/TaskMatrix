@@ -1,57 +1,81 @@
 import { useEffect, useRef, useState } from "react";
 import { SparkleIcon } from "../components/icon";
-import { toISODate, useTasks } from "../context/TaskContext";
-
-const SUGGESTIONS = [
-    "What's on my schedule today?",
-    "Which tasks are still pending?",
-    "Show my high priority tasks",
-];
-
-function reply(text, tasks) {
-    const q = text.toLowerCase();
-    const today = toISODate(new Date());
-    const list = (items) =>
-        items.length
-            ? items
-                  .map(
-                      (t) =>
-                          `• ${t.title} (${t.dueDate}, ${t.startTime}–${t.endTime})`,
-                  )
-                  .join("\n")
-            : "Nothing found.";
-    if (q.includes("today") || q.includes("schedule"))
-        return `Today's tasks:\n${list(tasks.filter((t) => t.dueDate === today))}`;
-    if (q.includes("high"))
-        return `High priority tasks:\n${list(tasks.filter((t) => t.priority === "High" && t.status === "Pending"))}`;
-    if (q.includes("pending") || q.includes("todo") || q.includes("left"))
-        return `Pending tasks:\n${list(tasks.filter((t) => t.status === "Pending"))}`;
-    return `You have ${tasks.filter((t) => t.status === "Pending").length} pending and ${tasks.filter((t) => t.status === "Completed").length} completed tasks. Try asking about today's schedule or high priority work.`;
-}
+import { useTasks } from "../context/TaskContext";
+import apiClient from "../services/apiClient"; // 🟢 Import Axios client đã cấu hình Interceptor
 
 export default function AiAgentChat() {
-    const { tasks } = useTasks();
+    // Lấy hàm fetchTasks/getTasks từ context để reload lại danh sách task sau khi AI tạo
+    const { fetchTasks } = useTasks();
+
     const [messages, setMessages] = useState([
         {
             id: 0,
             from: "ai",
-            text: "Hi, I'm your TASKY assistant. I can look through your tasks and schedule.",
+            text: "Xin chào! Tôi là trợ lý AI TaskMatrix. Hãy nhập yêu cầu tạo task bằng ngôn ngữ tự nhiên.",
         },
     ]);
     const [draft, setDraft] = useState("");
+    const [loading, setLoading] = useState(false); // 🟢 State xử lý hiệu ứng chờ AI
     const end = useRef(null);
-    useEffect(() => {
-        end.current?.scrollIntoView({ block: "end" });
-    }, [messages]);
 
-    const send = (text) => {
-        if (!text.trim()) return;
+    useEffect(() => {
+        end.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }, [messages, loading]);
+
+    const send = async (text) => {
+        if (!text.trim() || loading) return;
+
+        const userText = text.trim();
+
+        // 1. Hiển thị ngay tin nhắn người dùng lên khung chat
         setMessages((m) => [
             ...m,
-            { id: crypto.randomUUID(), from: "user", text: text.trim() },
-            { id: crypto.randomUUID(), from: "ai", text: reply(text, tasks) },
+            { id: crypto.randomUUID(), from: "user", text: userText },
         ]);
         setDraft("");
+        setLoading(true);
+
+        try {
+            const res = await apiClient.post("/aiagent/parse-and-create", {
+                prompt: userText,
+                userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            });
+
+            // Nếu là tạo Task thành công -> Reload danh sách Task ở UI
+            if (res.intent === "CREATE_TASK") {
+                setMessages((m) => [
+                    ...m,
+                    {
+                        id: crypto.randomUUID(),
+                        from: "ai",
+                        text: `✅ ${res.message}`,
+                    },
+                ]);
+                if (fetchTasks) await fetchTasks();
+            } else {
+                // Nếu chỉ là trò chuyện thông thường -> In ra câu trả lời của AI
+                setMessages((m) => [
+                    ...m,
+                    { id: crypto.randomUUID(), from: "ai", text: res.message },
+                ]);
+            }
+        } catch (error) {
+            // Xử lý thông báo lỗi từ Interceptor
+            const errorMsg =
+                typeof error === "string"
+                    ? error
+                    : "Không thể tạo công việc từ câu lệnh này.";
+            setMessages((m) => [
+                ...m,
+                {
+                    id: crypto.randomUUID(),
+                    from: "ai",
+                    text: `❌ ${errorMsg}\nVui lòng thử lại với câu lệnh cụ thể hơn.`,
+                },
+            ]);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -62,15 +86,16 @@ export default function AiAgentChat() {
                 </span>
                 <div>
                     <h2 className="font-display text-lg font-bold text-ink">
-                        AI Agent
+                        TaskMatrix AI Agent
                     </h2>
                     <p className="text-xs text-muted">
-                        Local demo assistant. Answers come from your tasks, not
-                        an external model.
+                        Tự động phân tích ngôn ngữ tự nhiên & đặt lịch vào hệ
+                        thống qua AI.
                     </p>
                 </div>
             </div>
 
+            {/* Chat Box Content */}
             <div
                 className="my-6 flex-1 space-y-3 overflow-y-auto"
                 role="log"
@@ -82,7 +107,7 @@ export default function AiAgentChat() {
                         key={m.id}
                         className={`flex ${m.from === "user" ? "justify-end" : "justify-start"}`}
                     >
-                        <p
+                        <div
                             className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm ${
                                 m.from === "user"
                                     ? "bg-ink text-white dark:!bg-brand dark:!text-slate-900"
@@ -90,25 +115,24 @@ export default function AiAgentChat() {
                             }`}
                         >
                             {m.text}
-                        </p>
+                        </div>
                     </div>
                 ))}
+
+                {/* 🟢 Hiệu ứng loading khi AI đang xử lý */}
+                {loading && (
+                    <div className="flex justify-start">
+                        <div className="rounded-2xl bg-canvas px-4 py-3 text-sm text-muted dark:bg-slate-700/50 dark:text-slate-300">
+                            <span className="animate-pulse">
+                                ✨ AI đang phân tích và tạo công việc...
+                            </span>
+                        </div>
+                    </div>
+                )}
                 <div ref={end} />
             </div>
 
-            <div className="mb-3 flex flex-wrap gap-2">
-                {SUGGESTIONS.map((s) => (
-                    <button
-                        key={s}
-                        type="button"
-                        onClick={() => send(s)}
-                        className="rounded-full border border-hairline px-3 py-1.5 text-xs font-medium text-muted transition hover:border-brand hover:text-ink"
-                    >
-                        {s}
-                    </button>
-                ))}
-            </div>
-
+            {/* Input Form */}
             <form
                 onSubmit={(e) => {
                     e.preventDefault();
@@ -119,15 +143,17 @@ export default function AiAgentChat() {
                 <input
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
-                    placeholder="Ask about your tasks..."
+                    disabled={loading}
+                    placeholder="Nhập yêu cầu tạo task (ví dụ: Họp team vào 9h sáng mai)..."
                     aria-label="Message"
-                    className="flex-1 rounded-xl border border-hairline bg-white px-4 py-2.5 text-sm text-ink outline-none transition placeholder:text-muted focus:border-brand dark:bg-slate-800 dark:border-slate-700/50 dark:text-white"
+                    className="flex-1 rounded-xl border border-hairline bg-white px-4 py-2.5 text-sm text-ink outline-none transition placeholder:text-muted focus:border-brand disabled:opacity-60 dark:bg-slate-800 dark:border-slate-700/50 dark:text-white"
                 />
                 <button
                     type="submit"
-                    className="rounded-xl bg-ink px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-black dark:!bg-brand dark:!text-slate-900"
+                    disabled={loading || !draft.trim()}
+                    className="rounded-xl bg-ink px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-black disabled:opacity-50 dark:!bg-brand dark:!text-slate-900"
                 >
-                    Send
+                    {loading ? "Đang xử lý..." : "Gửi"}
                 </button>
             </form>
         </section>
