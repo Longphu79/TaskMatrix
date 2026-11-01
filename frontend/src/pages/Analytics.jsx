@@ -5,7 +5,7 @@ import {
     ListIcon,
     FolderIcon,
     MoreIcon,
-} from "../assets/components/icon.jsx";
+} from "../components/icon";
 
 /* ---------- data ---------- */
 
