@@ -5,6 +5,7 @@ import AnalyticsPage from "./pages/Analytics";
 import TimesheetsPage from "./pages/Timesheets";
 import TodoPage from "./pages/Todo";
 import ReportPage from "./pages/Report";
+import DocumentsPage from "./pages/Documents";
 import SettingsPage from "./pages/Settings";
 import LoginPage from "./features/auth/pages/Login";
 import SignUpPage from "./features/auth/pages/SignUpPage";
@@ -27,6 +28,7 @@ export default function App() {
                     <Route path="/timesheets" element={<TimesheetsPage />} />
                     <Route path="/todo" element={<TodoPage />} />
                     <Route path="/report" element={<ReportPage />} />
+                    <Route path="/documents" element={<DocumentsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                 </Route>
             </Routes>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../../assets/context/AuthContext";
 import { useTheme } from "../../../assets/context/ThemeContext";
+import { getApiErrorMessage } from "../../../services/apiError";
 import {
     AuthHero,
     GoogleIcon,
@@ -57,19 +58,23 @@ export default function SignUpPage() {
         }
         setError("");
         setLoading(true);
-        await signup({ name, email, password });
-        navigate("/dashboard", {
-            state: { toast: "Account created — welcome to TASKY!" },
-        });
+        try {
+            await signup({ name, email, password });
+            navigate("/dashboard", {
+                state: { toast: "Account created — welcome to TASKY!" },
+            });
+        } catch (signupError) {
+            console.error("Signup failed:", signupError);
+            setError(await getApiErrorMessage(signupError));
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const social = async (provider) => {
-        if (loading) return;
-        setLoading(true);
-        await signup({ name: "", email: `you@${provider}.com` });
-        navigate("/dashboard", {
-            state: { toast: "Account created successfully!" },
-        });
+    const social = (provider) => {
+        setError(
+            `${provider} sign-in is not configured. Please create an account with email and password.`,
+        );
     };
 
     return (

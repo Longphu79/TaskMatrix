@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../../assets/context/AuthContext";
 import { useTheme } from "../../../assets/context/ThemeContext";
+import { getApiErrorMessage } from "../../../services/apiError";
 import {
     AuthHero,
     GoogleIcon,
@@ -21,22 +22,30 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [remember, setRemember] = useState(true);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (loading) return;
+        setError("");
         setLoading(true);
-        await login({ email, password });
-        navigate("/dashboard", {
-            state: { toast: "Welcome back to TASKMATRIX!" },
-        });
+        try {
+            await login({ email, password });
+            navigate("/dashboard", {
+                state: { toast: "Welcome back to TASKMATRIX!" },
+            });
+        } catch (loginError) {
+            console.error("Login failed:", loginError);
+            setError(await getApiErrorMessage(loginError));
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const social = async (provider) => {
-        if (loading) return;
-        setLoading(true);
-        await login({ email: `you@${provider}.com` });
-        navigate("/dashboard", { state: { toast: "Signed in successfully!" } });
+    const social = (provider) => {
+        setError(
+            `${provider} sign-in is not configured. Please sign in with email and password.`,
+        );
     };
 
     return (
@@ -121,6 +130,14 @@ export default function LoginPage() {
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-5">
+                        {error && (
+                            <p
+                                role="alert"
+                                className="text-sm font-medium text-[#e05656]"
+                            >
+                                {error}
+                            </p>
+                        )}
                         <div>
                             <label className="mb-1.5 block text-sm font-medium text-ink">
                                 Email address

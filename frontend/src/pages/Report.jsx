@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     ClockIcon,
     ChartIcon,
@@ -7,6 +7,7 @@ import {
     MoreIcon,
     ChevronDownIcon,
 } from "../assets/components/icon";
+import { reportApi } from "../features/reports/api/reportApi";
 
 /* ---------- data ---------- */
 
@@ -68,44 +69,6 @@ const REPORT_TYPES = [
     },
 ];
 
-const HISTORY = [
-    {
-        id: 1,
-        name: "September Attendance Report",
-        date: "Sep 07, 2026",
-        size: "1.2 MB",
-        format: "PDF",
-    },
-    {
-        id: 2,
-        name: "Matrix Domain Progress Summary",
-        date: "Sep 05, 2026",
-        size: "486 KB",
-        format: "CSV",
-    },
-    {
-        id: 3,
-        name: "Team Utilization – Q3",
-        date: "Sep 01, 2026",
-        size: "2.4 MB",
-        format: "PDF",
-    },
-    {
-        id: 4,
-        name: "Food Dashboard Timesheet",
-        date: "Aug 28, 2026",
-        size: "312 KB",
-        format: "CSV",
-    },
-    {
-        id: 5,
-        name: "August Billing Export",
-        date: "Aug 25, 2026",
-        size: "1.8 MB",
-        format: "PDF",
-    },
-];
-
 const PROJECTS = [
     "All Projects",
     "Food Dashboard",
@@ -113,7 +76,82 @@ const PROJECTS = [
     "Project Three",
     "Project Four",
 ];
-const MEMBERS = ["All Members", "Manjay Gupta", "John Ekeler", "Rubik Sans"];
+const MEMBERS = ["All Members", "Assigned to me"];
+const HISTORY_STORAGE_KEY = "taskmatrix-report-history";
+const REPORT_TITLES = Object.fromEntries(
+    REPORT_TYPES.map(({ key, title }) => [key, title]),
+);
+
+function localDateString(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
+function getDefaultDateRange() {
+    const today = new Date();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    return { fromDate: localDateString(monday), toDate: localDateString(today) };
+}
+
+function readReportHistory() {
+    try {
+        const history = JSON.parse(
+            localStorage.getItem(HISTORY_STORAGE_KEY) || "[]",
+        );
+        return Array.isArray(history) ? history : [];
+    } catch {
+        return [];
+    }
+}
+
+function formatFileSize(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function downloadFile(blob, fileName) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function getErrorMessage(error) {
+    const responseData = error?.response?.data || error;
+    if (responseData instanceof Blob) {
+        try {
+            const body = JSON.parse(await responseData.text());
+            return body.message || "Could not generate the report.";
+        } catch {
+            if (error.response.status === 401) {
+                return "The report API requires a backend-authenticated session.";
+            }
+            if (error.response.status === 404) {
+                return "The report endpoint was not found. Restart the backend after updating it.";
+            }
+            return `The report API returned HTTP ${error.response.status}.`;
+        }
+    }
+
+    if (!error?.response) {
+        return "Cannot reach the report API. Make sure the backend is running at http://localhost:5045.";
+    }
+
+    return (
+        responseData?.message ||
+        responseData?.title ||
+        error?.message ||
+        "Could not generate the report."
+    );
+}
 
 /* ---------- icons ---------- */
 
@@ -282,9 +320,63 @@ export default function ReportPage() {
     const [project, setProject] = useState(PROJECTS[0]);
     const [member, setMember] = useState(MEMBERS[0]);
     const [selected, setSelected] = useState("attendance");
+    const [dateRange, setDateRange] = useState(getDefaultDateRange);
+    const [history, setHistory] = useState(readReportHistory);
+    const [exporting, setExporting] = useState(false);
+    const [errorMessage, setErrorMessage] = useState("");
+    const [notice, setNotice] = useState("");
 
     const selectCls =
         "w-full appearance-none rounded-xl border border-hairline bg-white px-4 py-2.5 pr-9 text-sm font-medium text-ink outline-none transition focus:border-brand";
+
+    useEffect(() => {
+        localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
+    }, [history]);
+
+    const createRequest = (reportType) => ({
+        reportType,
+        format,
+        project,
+        member: member === "Assigned to me" ? "me" : "all",
+        fromDate: dateRange.fromDate,
+        toDate: dateRange.toDate,
+    });
+
+    const exportReport = async (request, saveToHistory = true) => {
+        if (exporting) return;
+        if (request.fromDate > request.toDate) {
+            setErrorMessage("Start date must be on or before end date.");
+            return;
+        }
+
+        setExporting(true);
+        setErrorMessage("");
+        setNotice("");
+        try {
+            const blob = await reportApi.export(request);
+            const fileName = `taskmatrix-${request.reportType}-${Date.now()}.${request.format.toLowerCase()}`;
+            downloadFile(blob, fileName);
+
+            if (saveToHistory) {
+                const newEntry = {
+                    id: `${Date.now()}-${Math.random()}`,
+                    name: `${REPORT_TITLES[request.reportType]} - ${request.project}`,
+                    date: new Date().toLocaleString(),
+                    size: formatFileSize(blob.size),
+                    format: request.format.toUpperCase(),
+                    request,
+                };
+                setHistory((previous) => [newEntry, ...previous].slice(0, 10));
+            }
+
+            setNotice("Report downloaded successfully.");
+        } catch (error) {
+            console.error("Report export failed:", error);
+            setErrorMessage(await getErrorMessage(error));
+        } finally {
+            setExporting(false);
+        }
+    };
 
     return (
         <div className="px-5 pb-8 lg:px-8">
@@ -314,17 +406,34 @@ export default function ReportPage() {
                 </h3>
                 <div className="grid gap-4 lg:grid-cols-4">
                     <Field label="Date Range">
-                        <button className="flex w-full items-center justify-between rounded-xl border border-hairline px-4 py-2.5 text-sm font-medium text-ink transition hover:border-brand">
-                            <span className="flex items-center gap-2">
-                                <CalendarIcon className="text-muted" />
-                                Sep 01 – Sep 07
-                            </span>
-                            <ChevronDownIcon
-                                width={16}
-                                height={16}
-                                className="text-muted"
+                        <div className="grid grid-cols-2 gap-2">
+                            <input
+                                aria-label="Start date"
+                                type="date"
+                                value={dateRange.fromDate}
+                                max={dateRange.toDate}
+                                onChange={(event) =>
+                                    setDateRange((previous) => ({
+                                        ...previous,
+                                        fromDate: event.target.value,
+                                    }))
+                                }
+                                className="w-full rounded-xl border border-hairline bg-white px-2 py-2.5 text-xs text-ink outline-none focus:border-brand"
                             />
-                        </button>
+                            <input
+                                aria-label="End date"
+                                type="date"
+                                value={dateRange.toDate}
+                                min={dateRange.fromDate}
+                                onChange={(event) =>
+                                    setDateRange((previous) => ({
+                                        ...previous,
+                                        toDate: event.target.value,
+                                    }))
+                                }
+                                className="w-full rounded-xl border border-hairline bg-white px-2 py-2.5 text-xs text-ink outline-none focus:border-brand"
+                            />
+                        </div>
                     </Field>
                     <Field label="Project">
                         <div className="relative">
@@ -391,11 +500,25 @@ export default function ReportPage() {
                         ·{" "}
                         <span className="font-semibold text-ink">{member}</span>
                     </p>
-                    <button className="flex items-center gap-2 rounded-2xl bg-ink px-6 py-3 text-sm font-semibold text-white transition hover:bg-black">
+                    <button
+                        disabled={exporting}
+                        onClick={() => exportReport(createRequest(selected))}
+                        className="flex items-center gap-2 rounded-2xl bg-ink px-6 py-3 text-sm font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
+                    >
                         <DownloadIcon />
-                        Generate Report
+                        {exporting ? "Generating..." : "Generate Report"}
                     </button>
                 </div>
+                {(errorMessage || notice) && (
+                    <p
+                        role={errorMessage ? "alert" : "status"}
+                        className={`mt-4 text-sm ${
+                            errorMessage ? "text-red-600" : "text-green-700"
+                        }`}
+                    >
+                        {errorMessage || notice}
+                    </p>
+                )}
             </div>
 
             {/* report preview cards */}
@@ -406,42 +529,50 @@ export default function ReportPage() {
                 {REPORT_TYPES.map((r) => {
                     const active = selected === r.key;
                     return (
-                        <button
+                        <div
                             key={r.key}
-                            onClick={() => setSelected(r.key)}
                             className={`rounded-3xl bg-white p-6 text-left shadow-[0_8px_30px_rgba(17,17,26,0.04)] transition hover:-translate-y-0.5 ${
                                 active
                                     ? "ring-2 ring-brand"
                                     : "ring-1 ring-transparent"
                             }`}
                         >
-                            <div className="mb-5 flex items-start justify-between">
-                                <span
-                                    className="flex h-11 w-11 items-center justify-center rounded-2xl"
-                                    style={{
-                                        background: `${r.accent}22`,
-                                        color: r.accent,
-                                    }}
-                                >
-                                    <FileIcon width={20} height={20} />
-                                </span>
-                                {active && (
-                                    <span className="rounded-full bg-brand-soft px-2.5 py-1 text-[11px] font-semibold text-[#a07a00]">
-                                        Selected
+                            <button
+                                type="button"
+                                aria-pressed={active}
+                                onClick={() => setSelected(r.key)}
+                                className="w-full text-left"
+                            >
+                                <div className="mb-5 flex items-start justify-between">
+                                    <span
+                                        className="flex h-11 w-11 items-center justify-center rounded-2xl"
+                                        style={{
+                                            background: `${r.accent}22`,
+                                            color: r.accent,
+                                        }}
+                                    >
+                                        <FileIcon width={20} height={20} />
                                     </span>
-                                )}
-                            </div>
-                            <h4 className="font-display text-base font-semibold text-ink">
-                                {r.title}
-                            </h4>
-                            <p className="mt-1 text-xs leading-relaxed text-muted">
-                                {r.desc}
-                            </p>
+                                    {active && (
+                                        <span className="rounded-full bg-brand-soft px-2.5 py-1 text-[11px] font-semibold text-[#a07a00]">
+                                            Selected
+                                        </span>
+                                    )}
+                                </div>
+                                <h4 className="font-display text-base font-semibold text-ink">
+                                    {r.title}
+                                </h4>
+                                <p className="mt-1 text-xs leading-relaxed text-muted">
+                                    {r.desc}
+                                </p>
 
-                            <div className="my-4 flex items-center gap-3">
-                                <MiniVisual accent={r.accent} type={r.key} />
-                            </div>
-
+                                <div className="my-4 flex items-center gap-3">
+                                    <MiniVisual
+                                        accent={r.accent}
+                                        type={r.key}
+                                    />
+                                </div>
+                            </button>
                             <div className="flex items-end justify-between border-t border-hairline pt-4">
                                 <div>
                                     <div className="font-display text-xl font-bold text-ink">
@@ -451,11 +582,18 @@ export default function ReportPage() {
                                         {r.metricLabel}
                                     </div>
                                 </div>
-                                <span className="flex items-center gap-1.5 text-sm font-semibold text-ink transition hover:text-brand">
+                                <button
+                                    type="button"
+                                    disabled={exporting}
+                                    onClick={() =>
+                                        exportReport(createRequest(r.key))
+                                    }
+                                    className="flex items-center gap-1.5 text-sm font-semibold text-ink transition hover:text-brand disabled:cursor-not-allowed disabled:opacity-60"
+                                >
                                     <DownloadIcon /> Export
-                                </span>
+                                </button>
                             </div>
-                        </button>
+                        </div>
                     );
                 })}
             </div>
@@ -467,11 +605,11 @@ export default function ReportPage() {
                         Export History
                     </h3>
                     <span className="rounded-full bg-canvas px-3 py-1 text-xs font-medium text-muted">
-                        {HISTORY.length} files
+                        {history.length} files
                     </span>
                 </div>
                 <div className="space-y-2">
-                    {HISTORY.map((h) => (
+                    {history.map((h) => (
                         <div
                             key={h.id}
                             className="flex flex-wrap items-center gap-4 rounded-2xl border border-hairline p-4 transition hover:border-brand/60 hover:bg-canvas/50"
@@ -491,12 +629,21 @@ export default function ReportPage() {
                                 </div>
                             </div>
                             <FormatBadge format={h.format} />
-                            <button className="flex items-center gap-2 rounded-xl border border-hairline px-4 py-2 text-sm font-medium text-ink transition hover:border-brand hover:bg-brand-soft">
+                            <button
+                                disabled={exporting}
+                                onClick={() => exportReport(h.request, false)}
+                                className="flex items-center gap-2 rounded-xl border border-hairline px-4 py-2 text-sm font-medium text-ink transition hover:border-brand hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60"
+                            >
                                 <DownloadIcon />
                                 Download
                             </button>
                         </div>
                     ))}
+                    {history.length === 0 && (
+                        <p className="py-8 text-center text-sm text-muted">
+                            Your generated reports will appear here.
+                        </p>
+                    )}
                 </div>
             </div>
         </div>
