@@ -11,11 +11,8 @@ public class AiResponseDto
 {
     // "CREATE_TASK" hoặc "CHAT"
     public string Intent { get; set; } = "CHAT";
-
-    // Câu trả lời bằng văn bản của AI gửi lại cho user
     public string ReplyMessage { get; set; } = string.Empty;
-
-    // Thông tin Task (chỉ có dữ liệu khi Intent == "CREATE_TASK")
+    public string? TargetTaskTitle { get; set; }
     public ParsedTaskDto? Task { get; set; }
 }
 
