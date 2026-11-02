@@ -187,3 +187,30 @@ export const ChevronDown = (p) => (
         <path d="m6 9 6 6 6-6" />
     </svg>
 );
+
+export function BuildingIcon(p) {
+    return (
+        <svg {...base} {...p}>
+            <rect x="5" y="3" width="14" height="18" rx="2" />
+            <path d="M9 7h1m4 0h1M9 11h1m4 0h1M10 21v-5h4v5" />
+        </svg>
+    );
+}
+
+export function SparkleIcon(p) {
+    return (
+        <svg {...base} {...p}>
+            <path d="M11 3l1.8 5.2L18 10l-5.2 1.8L11 17l-1.8-5.2L4 10l5.2-1.8L11 3Z" />
+            <path d="M18.5 15l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7.7-2Z" />
+        </svg>
+    );
+}
+
+export function ChatIcon(p) {
+    return (
+        <svg {...base} {...p}>
+            <path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-3 3V11.5A8.5 8.5 0 0 1 9.5 3h3a8.5 8.5 0 0 1 8.5 8.5Z" />
+            <path d="M7 10h8M7 14h5" />
+        </svg>
+    );
+}

@@ -310,11 +310,6 @@ function TodoPanel() {
                     </div>
                 ))}
             </div>
-            <div className="mt-6 flex justify-end">
-                <button className="rounded-xl bg-[#1c1c1c] px-5 py-2 text-xs font-medium text-white transition hover:bg-black dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200">
-                    View Reports
-                </button>
-            </div>
         </div>
     );
 }

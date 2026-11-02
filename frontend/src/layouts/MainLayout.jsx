@@ -6,7 +6,6 @@ import {
     ClockIcon,
     ListIcon,
     FileIcon,
-    SettingsIcon,
     BellIcon,
     SearchIcon,
     ChevronDownIcon,
@@ -29,12 +28,11 @@ const NAV = [
         Icon: ClockIcon,
     },
     { key: "todo", label: "Todo", path: "/todo", Icon: ListIcon },
-    { key: "report", label: "Report", path: "/report", Icon: FileIcon },
     {
-        key: "settings",
-        label: "Settings",
-        path: "/settings",
-        Icon: SettingsIcon,
+        key: "documents",
+        label: "Documents",
+        path: "/documents",
+        Icon: FileIcon,
     },
 ];
 

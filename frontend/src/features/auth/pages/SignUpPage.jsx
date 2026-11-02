@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../../assets/context/AuthContext";
 import { useTheme } from "../../../assets/context/ThemeContext";
+import { getApiErrorMessage, isMockApi } from "../../../api";
 import {
     AuthHero,
     GoogleIcon,
@@ -57,19 +58,20 @@ export default function SignUpPage() {
         }
         setError("");
         setLoading(true);
-        await signup({ name, email, password });
-        navigate("/dashboard", {
-            state: { toast: "Account created — welcome to TASKY!" },
-        });
+        try {
+            await signup({ name, email, password });
+            navigate("/dashboard", {
+                state: { toast: "Account created — welcome to TASKY!" },
+            });
+        } catch (signupError) {
+            setError(getApiErrorMessage(signupError, "Could not create your account."));
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const social = async (provider) => {
-        if (loading) return;
-        setLoading(true);
-        await signup({ name: "", email: `you@${provider}.com` });
-        navigate("/dashboard", {
-            state: { toast: "Account created successfully!" },
-        });
+    const social = (provider) => {
+        setError(`${provider} sign-in is not configured yet. Use email and password.`);
     };
 
     return (
@@ -120,6 +122,11 @@ export default function SignUpPage() {
                     <h1 className="font-display text-2xl font-bold text-ink">
                         Create your account
                     </h1>
+                    {isMockApi && (
+                        <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+                            Offline demo is on. Your test account is stored only in this browser.
+                        </p>
+                    )}
                     <p className="mt-1.5 text-sm text-muted">
                         Already have an account?{" "}
                         <Link

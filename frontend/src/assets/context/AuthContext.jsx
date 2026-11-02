@@ -1,16 +1,7 @@
 import { createContext, useContext, useState } from "react";
+import api from "../../api";
 
 const AuthContext = createContext(undefined);
-
-function deriveName(email) {
-    const handle = (email || "").split("@")[0] || "Member";
-    return handle
-        .replace(/[._-]+/g, " ")
-        .split(" ")
-        .filter(Boolean)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(" ");
-}
 
 function getStoredUser() {
     if (typeof window === "undefined") return null;
@@ -30,38 +21,43 @@ export function AuthProvider({ children }) {
         if (u) {
             localStorage.setItem("tasky-user", JSON.stringify(u));
             localStorage.setItem("isAuthenticated", "true");
+            localStorage.setItem("tasky-token", u.token);
         } else {
             localStorage.removeItem("tasky-user");
             localStorage.removeItem("isAuthenticated");
+            localStorage.removeItem("tasky-token");
         }
     };
 
-    // Mock auth — resolves after a short delay so the UI can show a spinner.
-    const login = ({ email }) =>
-        new Promise((resolve) => {
-            setTimeout(() => {
-                const u = {
-                    name: deriveName(email),
-                    email,
-                    role: "UI/UX Designer",
-                };
-                persist(u);
-                resolve(u);
-            }, 700);
-        });
+    const login = async ({ email, password }) => {
+        const { data } = await api.post("/auth/login", { email, password });
+        const authenticatedUser = {
+            id: data.userId,
+            name: data.fullName,
+            email: data.email,
+            role: data.role,
+            token: data.token,
+        };
+        persist(authenticatedUser);
+        return authenticatedUser;
+    };
 
-    const signup = ({ name, email }) =>
-        new Promise((resolve) => {
-            setTimeout(() => {
-                const u = {
-                    name: name?.trim() || deriveName(email),
-                    email,
-                    role: "New Member",
-                };
-                persist(u);
-                resolve(u);
-            }, 800);
+    const signup = async ({ name, email, password }) => {
+        const { data } = await api.post("/auth/register", {
+            fullName: name,
+            email,
+            password,
         });
+        const authenticatedUser = {
+            id: data.userId,
+            name: data.fullName,
+            email: data.email,
+            role: data.role,
+            token: data.token,
+        };
+        persist(authenticatedUser);
+        return authenticatedUser;
+    };
 
     const logout = () => persist(null);
 

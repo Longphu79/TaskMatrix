@@ -32,6 +32,7 @@ builder.Services
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<TaskService>();
+builder.Services.AddScoped<IDocumentService, DocumentService>();
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new InvalidOperationException(
         "JWT key is not configured.");
