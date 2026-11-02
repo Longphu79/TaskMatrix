@@ -63,16 +63,32 @@ public class ProfileController : ControllerBase
         }
 
         var user = await _userService.GetByIdAsync(userId);
-        if (user == null) {
+        if (user == null)
+        {
             return NotFound();
         }
+
         var fullName = string.IsNullOrWhiteSpace(request.FullName) ? user.FullName : request.FullName.Trim();
-        await _userService.UpdateProfileAsync(userId, fullName, request.Occupation?.Trim(), request.Goals, request.FreeTime?.Trim());
-        var updatedUser =
-        await _userService.GetByIdAsync(userId);
+        var updated = await _userService.UpdateProfileAsync(
+            userId,
+            fullName,
+            request.Occupation?.Trim(),
+            request.Goals,
+            request.FreeTime?.Trim());
+        if (!updated)
+        {
+            return NotFound();
+        }
+
+        var updatedUser = await _userService.GetByIdAsync(userId);
+        if (updatedUser == null)
+        {
+            return NotFound();
+        }
+
         var response = new ProfileResponse
         {
-            UserId = updatedUser!.Id!,
+            UserId = updatedUser.Id!,
             FullName = updatedUser.FullName,
             Email = updatedUser.Email,
             Occupation = updatedUser.Occupation,

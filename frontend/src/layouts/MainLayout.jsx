@@ -110,7 +110,11 @@ function Topbar({ onMenu }) {
     const location = useLocation();
 
     const currentNav = NAV.find((n) => n.path === location.pathname);
-    const title = currentNav ? currentNav.label : "Dashboard";
+    const title = location.pathname === "/profile"
+        ? "My Profile"
+        : currentNav
+          ? currentNav.label
+          : "Dashboard";
 
     return (
         <header className="flex items-center gap-4 px-5 py-5 lg:px-8">

@@ -196,7 +196,7 @@ export default function UserDropdown() {
                         <MenuItem
                             Icon={UserIcon}
                             label="My Profile"
-                            onClick={() => go("/settings")}
+                            onClick={() => go("/profile")}
                         />
                         <MenuItem
                             Icon={CogIcon}

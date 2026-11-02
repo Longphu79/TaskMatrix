@@ -6,6 +6,7 @@ import TimesheetsPage from "./pages/Timesheets";
 import TodoPage from "./pages/Todo";
 import DocumentsPage from "./pages/Documents";
 import SettingsPage from "./pages/Settings";
+import ProfilePage from "./pages/Profile";
 import LoginPage from "./features/auth/pages/Login";
 import SignUpPage from "./features/auth/pages/SignUpPage";
 import LandingPage from "./features/auth/pages/LandingPage";
@@ -27,6 +28,7 @@ export default function App() {
                     <Route path="/timesheets" element={<TimesheetsPage />} />
                     <Route path="/todo" element={<TodoPage />} />
                     <Route path="/documents" element={<DocumentsPage />} />
+                    <Route path="/profile" element={<ProfilePage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                 </Route>
             </Routes>

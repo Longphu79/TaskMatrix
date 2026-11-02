@@ -60,10 +60,14 @@ export function AuthProvider({ children }) {
     };
 
     const logout = () => persist(null);
+    const updateUser = (updates) => {
+        if (!user) return;
+        persist({ ...user, ...updates });
+    };
 
     return (
         <AuthContext.Provider
-            value={{ user, isAuthenticated: !!user, login, signup, logout }}
+            value={{ user, isAuthenticated: !!user, login, signup, logout, updateUser }}
         >
             {children}
         </AuthContext.Provider>

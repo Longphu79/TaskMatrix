@@ -85,6 +85,22 @@ function getCurrentUser() {
     }
 }
 
+function getStoredProfile() {
+    const user = getCurrentUser();
+    const key = `tasky-mock-profile:${getUserId()}`;
+    const stored = localStorage.getItem(key);
+    if (stored) return JSON.parse(stored);
+
+    return {
+        userId: user?.id || getUserId(),
+        fullName: user?.name || "Offline Member",
+        email: user?.email || "",
+        occupation: user?.role || "",
+        goals: [],
+        freeTime: "",
+    };
+}
+
 function getDocuments() {
     const key = getStorageKey();
     const saved = localStorage.getItem(key);
@@ -263,6 +279,9 @@ async function createDocument(form) {
 
 const mockApi = {
     async get(url, config = {}) {
+        if (url === "/profile/me") {
+            return response(getStoredProfile());
+        }
         if (url === "/documents") {
             return response(getDocuments().map(publicDocument));
         }
@@ -305,6 +324,21 @@ const mockApi = {
     },
 
     async put(url, form) {
+        if (url === "/profile/me") {
+            const profile = {
+                ...getStoredProfile(),
+                fullName: form.fullName,
+                occupation: form.occupation || "",
+                goals: Array.isArray(form.goals) ? form.goals : [],
+                freeTime: form.freeTime || "",
+            };
+            localStorage.setItem(
+                `tasky-mock-profile:${getUserId()}`,
+                JSON.stringify(profile),
+            );
+            return response(profile);
+        }
+
         const match = /^\/documents\/([^/]+)$/.exec(url);
         if (!match) throw createError("Offline demo endpoint not found.", 404);
 
