@@ -1,3 +1,5 @@
+import { TEAM_DEMO_DOCUMENTS, TEAM_WORKS } from "./teamWorkData.js";
+
 const DOCUMENTS_KEY = "tasky-mock-documents";
 const MAX_FILE_SIZE = 1024 * 1024;
 
@@ -16,6 +18,8 @@ const demoDocuments = () => {
             format: "TXT",
             category: "Engineering",
             progress: 65,
+            workId: "work-preparation",
+            taskId: "task-development",
             start: start.toISOString(),
             deadline: deadline.toISOString(),
             size: 44,
@@ -31,6 +35,8 @@ const demoDocuments = () => {
             format: "TXT",
             category: "Design",
             progress: 30,
+            workId: "work-preparation",
+            taskId: "task-documentation",
             start: start.toISOString(),
             deadline: deadline.toISOString(),
             size: 38,
@@ -46,6 +52,8 @@ const demoDocuments = () => {
             format: "TXT",
             category: "Finance",
             progress: 100,
+            workId: "work-requirements",
+            taskId: "task-requirement-report",
             start: start.toISOString(),
             deadline: deadline.toISOString(),
             size: 38,
@@ -69,12 +77,32 @@ function getStorageKey() {
     return `${DOCUMENTS_KEY}:${getUserId()}`;
 }
 
+function getCurrentUser() {
+    try {
+        return JSON.parse(localStorage.getItem("tasky-user") || "null");
+    } catch {
+        return null;
+    }
+}
+
 function getDocuments() {
     const key = getStorageKey();
     const saved = localStorage.getItem(key);
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+        const user = getCurrentUser();
+        const documents = JSON.parse(saved).map((document) => ({
+            ...document,
+            uploadedBy: document.uploadedBy || user?.name || "Offline Member",
+        }));
+        localStorage.setItem(key, JSON.stringify(documents));
+        return documents;
+    }
 
-    const initial = demoDocuments();
+    const user = getCurrentUser();
+    const initial = demoDocuments().map((document) => ({
+        ...document,
+        uploadedBy: user?.name || "Offline Member",
+    }));
     localStorage.setItem(key, JSON.stringify(initial));
     return initial;
 }
@@ -86,6 +114,62 @@ function saveDocuments(documents) {
 function publicDocument(document) {
     const { content, ...metadata } = document;
     return metadata;
+}
+
+function getTeamDocuments() {
+    const documents = [...TEAM_DEMO_DOCUMENTS];
+    for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index);
+        if (!key?.startsWith(`${DOCUMENTS_KEY}:`)) continue;
+        const saved = localStorage.getItem(key);
+        if (saved) documents.push(...JSON.parse(saved));
+    }
+    return documents;
+}
+
+function getTeamWorks() {
+    const documents = getTeamDocuments();
+    const works = TEAM_WORKS.map((work) => ({
+        ...work,
+        tasks: work.tasks.map((task) => ({
+            ...task,
+            documents: documents
+                .filter((document) => document.workId === work.id && document.taskId === task.id)
+                .map((document) => ({
+                    ...publicDocument(document),
+                    uploadedBy: document.uploadedBy || "Offline Member",
+                })),
+        })),
+    }));
+    const assignedIds = new Set(
+        TEAM_WORKS.flatMap((work) => work.tasks.map((task) => task.id)),
+    );
+    const unassignedDocuments = documents
+        .filter((document) => !assignedIds.has(document.taskId))
+        .map((document) => ({
+            ...publicDocument(document),
+            uploadedBy: document.uploadedBy || "Offline Member",
+        }));
+
+    if (unassignedDocuments.length) {
+        works.push({
+            id: "work-unassigned",
+            key: "—",
+            title: "Unassigned uploads",
+            assignee: "Team",
+            priority: "—",
+            status: "Needs assignment",
+            tasks: [{
+                id: "task-unassigned",
+                key: "—",
+                title: "Documents without a Work or Task",
+                assignee: "Team",
+                status: "To Do",
+                documents: unassignedDocuments,
+            }],
+        });
+    }
+    return works;
 }
 
 function createError(message, status) {
@@ -160,6 +244,9 @@ async function createDocument(form) {
         format: file.name.split(".").pop()?.toUpperCase() || "",
         category: String(formValue(form, "category") || ""),
         progress: Number(formValue(form, "progress") || 0),
+        workId: String(formValue(form, "workId") || ""),
+        taskId: String(formValue(form, "taskId") || ""),
+        uploadedBy: getCurrentUser()?.name || "Offline Member",
         start: new Date(String(formValue(form, "start"))).toISOString(),
         deadline: new Date(String(formValue(form, "deadline"))).toISOString(),
         size: file.size,
@@ -179,10 +266,14 @@ const mockApi = {
         if (url === "/documents") {
             return response(getDocuments().map(publicDocument));
         }
+        if (url === "/team/works") {
+            getUserId();
+            return response(getTeamWorks());
+        }
 
         const downloadMatch = /^\/documents\/([^/]+)\/download$/.exec(url);
         if (downloadMatch) {
-            const document = getDocuments().find((item) => item.id === downloadMatch[1]);
+            const document = getTeamDocuments().find((item) => item.id === downloadMatch[1]);
             if (!document) throw createError("Document not found.", 404);
             return response(decodeContent(document.content), {
                 "content-disposition": `attachment; filename="${document.fileName}"`,
@@ -226,6 +317,8 @@ const mockApi = {
             title: String(formValue(form, "title") || ""),
             category: String(formValue(form, "category") || ""),
             progress: Number(formValue(form, "progress") || 0),
+            workId: String(formValue(form, "workId") || documents[index].workId || ""),
+            taskId: String(formValue(form, "taskId") || documents[index].taskId || ""),
             start: new Date(String(formValue(form, "start"))).toISOString(),
             deadline: new Date(String(formValue(form, "deadline"))).toISOString(),
             updatedAt: new Date().toISOString(),

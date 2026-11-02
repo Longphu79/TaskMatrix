@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import api, { getApiErrorMessage, isMockApi } from "../api"
+import { TEAM_WORKS } from "../teamWorkData"
 import {
   FileIcon,
   SearchIcon,
@@ -13,25 +14,6 @@ import {
 const CATEGORIES = ["Design", "Finance", "Legal", "Engineering", "Marketing"]
 
 const pad = (n) => String(n).padStart(2, "0")
-
-const SUBMISSIONS = [
-  { id: 1, name: "Amara Okafor", title: "Sprint 24 Retrospective", project: "Atlas", date: "2025-06-12", progress: 100, status: "In Review" },
-  { id: 2, name: "Daniel Reyes", title: "Landing Page Copy Deck", project: "Nova", date: "2025-06-11", progress: 90, status: "In Review" },
-  { id: 3, name: "Priya Nair", title: "Infrastructure Cost Report", project: "Atlas", date: "2025-06-10", progress: 100, status: "Approved" },
-  { id: 4, name: "Lucas Meyer", title: "Customer Interview Notes", project: "Helix", date: "2025-06-09", progress: 55, status: "Needs Revision" },
-  { id: 5, name: "Sofia Rossi", title: "Brand Refresh Moodboard", project: "Nova", date: "2025-06-08", progress: 100, status: "Approved" },
-  { id: 6, name: "Amara Okafor", title: "Release Notes v3.2", project: "Helix", date: "2025-06-07", progress: 100, status: "In Review" },
-  { id: 7, name: "Kenji Watanabe", title: "Quarterly OKR Summary", project: "Atlas", date: "2025-06-05", progress: 72, status: "Needs Revision" },
-  { id: 8, name: "Priya Nair", title: "Data Retention Policy", project: "Helix", date: "2025-06-03", progress: 100, status: "Approved" },
-]
-
-const STATUS_STYLES = {
-  Approved: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  "In Review": "bg-amber-50 text-amber-700 ring-amber-200",
-  "In Progress": "bg-amber-50 text-amber-700 ring-amber-200",
-  Completed: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  "Needs Revision": "bg-red-50 text-red-700 ring-red-200",
-}
 
 const card =
   "rounded-3xl bg-white shadow-[0_8px_30px_rgba(17,17,26,0.04)] dark:border dark:border-slate-700/50"
@@ -59,8 +41,6 @@ const deadlineInfo = (d) => {
   if (days <= 3) return { label, cls: "bg-amber-50 text-amber-700 ring-amber-200" }
   return { label, cls: "bg-hairline text-ink ring-transparent dark:bg-slate-700" }
 }
-const initials = (name) => name.split(" ").map((p) => p[0]).join("").slice(0, 2)
-
 const toLocalInput = (value) => {
   const date = new Date(value)
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
@@ -73,7 +53,7 @@ const fromApiDocument = (doc) => ({
   created: doc.createdAt?.slice(0, 10),
   updated: doc.updatedAt?.slice(0, 10),
   size: fmtSize(doc.size),
-  owner: "You",
+  owner: doc.uploadedBy || "You",
   pages: 4,
 })
 const downloadDoc = async (doc) => {
@@ -105,15 +85,6 @@ function ProgressBar({ value, tone = "brand" }) {
         {value}%
       </span>
     </div>
-  )
-}
-
-function StatusBadge({ status }) {
-  return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${STATUS_STYLES[status]}`}>
-      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-      {status}
-    </span>
   )
 }
 
@@ -176,7 +147,7 @@ function ActionMenu({ onAction, doc }) {
     document.addEventListener("mousedown", close)
     return () => document.removeEventListener("mousedown", close)
   }, [open])
-  const items = ["Update %", "Edit", "Download", "Delete"]
+  const items = ["Edit", "Download", "Delete"]
   return (
     <div className="relative" ref={ref}>
       <button
@@ -216,11 +187,15 @@ function DocModal({ mode, doc, onClose, onSave }) {
   const [start, setStart] = useState(doc?.start ?? nowLocal())
   const [deadline, setDeadline] = useState(doc?.deadline ?? "")
   const [progress, setProgress] = useState(doc?.progress ?? 0)
+  const [workId, setWorkId] = useState(doc?.workId ?? TEAM_WORKS[0].id)
+  const [taskId, setTaskId] = useState(doc?.taskId ?? TEAM_WORKS[0].tasks[0].id)
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
   const inputRef = useRef(null)
   const upload = mode === "upload"
   const format = file ? extOf(file.name) : doc?.format
+  const selectedWork = TEAM_WORKS.find((work) => work.id === workId) ?? TEAM_WORKS[0]
+  const availableTasks = selectedWork.tasks
 
   const pick = (f) => {
     if (!f) return
@@ -233,6 +208,9 @@ function DocModal({ mode, doc, onClose, onSave }) {
     if (upload && !file) return setError("Please choose a file to upload.")
     if (!title.trim()) return setError("Please enter a document title.")
     if (!start) return setError("Please choose a start date.")
+    if (isMockApi && !availableTasks.some((task) => task.id === taskId)) {
+      return setError("Please choose a task for this document.")
+    }
     if (deadline && start && deadline < start) return setError("Deadline must be after the start date.")
     setSaving(true)
     try {
@@ -242,6 +220,8 @@ function DocModal({ mode, doc, onClose, onSave }) {
         start,
         deadline: deadline || start,
         progress: Number(progress),
+        workId,
+        taskId,
         ...(file ? { file, format: extOf(file.name) || "FILE", size: fmtSize(file.size) } : {}),
       })
     } catch (saveError) {
@@ -291,6 +271,30 @@ function DocModal({ mode, doc, onClose, onSave }) {
         )}
 
         <div className="grid gap-4 sm:grid-cols-2">
+          {isMockApi && (
+            <>
+              <label className="block text-sm font-semibold text-ink">
+                Work
+                <select
+                  value={workId}
+                  onChange={(event) => {
+                    const nextWork = TEAM_WORKS.find((work) => work.id === event.target.value)
+                    setWorkId(event.target.value)
+                    setTaskId(nextWork?.tasks[0]?.id ?? "")
+                  }}
+                  className={`${field} mt-2 w-full`}
+                >
+                  {TEAM_WORKS.map((work) => <option key={work.id} value={work.id}>{work.key} · {work.title}</option>)}
+                </select>
+              </label>
+              <label className="block text-sm font-semibold text-ink">
+                Task
+                <select value={taskId} onChange={(event) => setTaskId(event.target.value)} className={`${field} mt-2 w-full`}>
+                  {availableTasks.map((task) => <option key={task.id} value={task.id}>{task.key} · {task.title}</option>)}
+                </select>
+              </label>
+            </>
+          )}
           <label className="block text-sm font-semibold text-ink sm:col-span-2">
             <span className="flex items-center gap-2">Document Title {!upload && format && <span className="rounded-md bg-ink px-2 py-0.5 text-[10px] font-bold text-white">{format}</span>}</span>
             <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Quarterly Report" className={`${field} mt-2 w-full`} />
@@ -328,13 +332,11 @@ function DocModal({ mode, doc, onClose, onSave }) {
 
 /* ---------- viewer modal ---------- */
 
-function Viewer({ doc, onClose, onProgress, onDownload }) {
+function Viewer({ doc, onClose, onDownload }) {
   const [page, setPage] = useState(1)
   const [zoom, setZoom] = useState(100)
-  const [draftProgress, setDraftProgress] = useState(doc.progress)
   const info = deadlineInfo(doc)
   const pages = doc.pages ?? 4
-  useEffect(() => setDraftProgress(doc.progress), [doc.progress])
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose()
     document.addEventListener("keydown", onKey)
@@ -404,23 +406,6 @@ function Viewer({ doc, onClose, onProgress, onDownload }) {
           {/* sidebar */}
           <aside className="w-full shrink-0 space-y-6 overflow-y-auto border-t border-hairline p-6 lg:w-80 lg:border-t-0 lg:border-l dark:border-slate-700">
             <section>
-              <h4 className="text-xs font-bold tracking-wide text-muted uppercase">Progress Tracker</h4>
-              <div className="mt-3"><ProgressBar value={draftProgress} /></div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="5"
-                value={draftProgress}
-                onChange={(e) => setDraftProgress(Number(e.target.value))}
-                onPointerUp={() => onProgress(doc.id, draftProgress)}
-                onKeyUp={() => onProgress(doc.id, draftProgress)}
-                aria-label="Update progress"
-                className="mt-4 w-full accent-[#F6C62E]"
-              />
-              <p className="mt-1 text-xs text-muted">Drag to update progress on the fly.</p>
-            </section>
-            <section>
               <h4 className="text-xs font-bold tracking-wide text-muted uppercase">Schedule</h4>
               <dl className="mt-3 space-y-3 text-sm">
                 <div className="flex justify-between"><dt className="text-muted">Start</dt><dd className="font-semibold text-ink">{fmtDateTime(doc.start)}</dd></div>
@@ -438,32 +423,6 @@ function Viewer({ doc, onClose, onProgress, onDownload }) {
           </aside>
         </div>
       </div>
-    </div>
-  )
-}
-
-function FeedbackModal({ item, onClose, onSend }) {
-  const [text, setText] = useState("")
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={onClose}>
-      <form
-        onMouseDown={(e) => e.stopPropagation()}
-        onSubmit={(e) => {
-          e.preventDefault()
-          onSend(text.trim())
-        }}
-        className={`${card} w-full max-w-md space-y-4 p-7`}
-      >
-        <div>
-          <h3 className="font-display text-xl font-bold text-ink">Review &amp; Feedback</h3>
-          <p className="mt-1 text-sm text-muted">{item.title} · {item.name}</p>
-        </div>
-        <textarea autoFocus rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder="Share what needs to change..." className={`${field} h-auto w-full py-3`} />
-        <div className="flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="h-11 rounded-2xl px-5 text-sm font-semibold text-muted hover:text-ink">Cancel</button>
-          <button type="submit" className="h-11 rounded-2xl bg-ink px-6 text-sm font-semibold text-white hover:bg-black">Request Revision</button>
-        </div>
-      </form>
     </div>
   )
 }
@@ -526,8 +485,8 @@ function MyDocuments({ docs, onAction, setModal, setViewing }) {
                 role="button"
                 tabIndex={0}
                 aria-label={`Open ${d.title}`}
-                onClick={() => setViewing(d.id)}
-                onKeyDown={(e) => e.key === "Enter" && e.target === e.currentTarget && setViewing(d.id)}
+                onClick={() => setViewing(d)}
+                onKeyDown={(e) => e.key === "Enter" && e.target === e.currentTarget && setViewing(d)}
                 className="group cursor-pointer rounded-3xl border border-hairline bg-white p-5 transition duration-200 outline-none hover:scale-[1.02] hover:border-brand hover:shadow-[0_0_0_4px_rgba(246,198,46,0.22),0_16px_40px_rgba(17,17,26,0.08)] focus-visible:border-brand focus-visible:ring-4 focus-visible:ring-brand/30 dark:border-slate-700"
               >
                 <div className="flex items-start gap-4">
@@ -567,116 +526,155 @@ function MyDocuments({ docs, onAction, setModal, setViewing }) {
 
 /* ---------- tab 2 ---------- */
 
-function TeamReports() {
-  const [rows, setRows] = useState(SUBMISSIONS)
-  const [q, setQ] = useState("")
-  const [member, setMember] = useState("All Team Members")
-  const [project, setProject] = useState("All Projects")
-  const [from, setFrom] = useState("")
-  const [to, setTo] = useState("")
-  const [feedback, setFeedback] = useState(null)
+function TeamReports({ refreshKey, onPreview }) {
+  const [works, setWorks] = useState([])
+  const [loading, setLoading] = useState(isMockApi)
+  const [error, setError] = useState("")
+  const [openWorks, setOpenWorks] = useState({})
+  const [openTasks, setOpenTasks] = useState({})
 
-  const members = [...new Set(SUBMISSIONS.map((s) => s.name))]
-  const projects = [...new Set(SUBMISSIONS.map((s) => s.project))]
-  const pending = rows.filter((r) => r.status === "In Review").length
+  useEffect(() => {
+    if (!isMockApi) {
+      setLoading(false)
+      return
+    }
 
-  const visible = rows.filter(
-    (r) =>
-      r.name.toLowerCase().includes(q.toLowerCase()) &&
-      (member === "All Team Members" || r.name === member) &&
-      (project === "All Projects" || r.project === project) &&
-      (!from || r.date >= from) &&
-      (!to || r.date <= to),
-  )
-  const setStatus = (id, status) => setRows((l) => l.map((r) => (r.id === id ? { ...r, status } : r)))
+    let active = true
+    setLoading(true)
+    api.get("/team/works")
+      .then(({ data }) => {
+        if (active) {
+          setWorks(data)
+          setError("")
+        }
+      })
+      .catch((requestError) => {
+        if (active) setError(getApiErrorMessage(requestError, "Could not load team works."))
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
+  }, [refreshKey])
+
+  const taskCount = works.reduce((total, work) => total + work.tasks.length, 0)
+  const documents = works.flatMap((work) => work.tasks.flatMap((task) => task.documents))
+  const memberCount = new Set(documents.map((document) => document.uploadedBy)).size
 
   return (
     <div className="space-y-8">
-      <div className="grid gap-5 md:grid-cols-3">
-        <Stat dark label="Total Team Members" value={8} hint="8 Active">
-          <span className="flex -space-x-2">
-            {members.slice(0, 3).map((m) => (
-              <span key={m} className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-[11px] font-bold text-ink ring-2 ring-ink">{initials(m)}</span>
-            ))}
-          </span>
+      {!isMockApi && (
+        <p className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-medium text-amber-900">
+          Team Work → Task → Documents is available in offline demo mode. The live API does not yet have shared Work/Task assignments or team document access.
+        </p>
+      )}
+      {error && <p role="alert" className="rounded-2xl bg-red-50 px-5 py-4 text-sm font-medium text-red-700">{error}</p>}
+
+      <div className="grid gap-5 sm:grid-cols-3">
+        <Stat dark label="Works" value={works.length} hint="Team work items">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-ink"><FolderIcon /></span>
         </Stat>
-        <Stat label="Team Avg Completion" value={"82%"} hint="Across active documents">
-          <Ring value={82} />
+        <Stat label="Tasks" value={taskCount} hint="Across all works">
+          <span className="rounded-full bg-brand-soft px-3 py-1 text-xs font-semibold text-ink">Tasks</span>
         </Stat>
-        <Stat label="Pending Reviews" value={pending} hint={`Document${pending === 1 ? "" : "s"} awaiting feedback`}>
-          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">Action needed</span>
+        <Stat label="Member Documents" value={documents.length} hint={`${memberCount} members uploaded`}>
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">Uploaded</span>
         </Stat>
       </div>
 
-      <section className={`${card} p-6`}>
-        <div className="mb-6 flex flex-wrap items-center gap-3">
-          <SearchBox value={q} onChange={setQ} placeholder="Search by member name..." />
-          <Select label="Team member" value={member} onChange={setMember} options={["All Team Members", ...members]} />
-          <Select label="Project" value={project} onChange={setProject} options={["All Projects", ...projects]} />
-          <div className="flex items-center gap-2">
-            <input type="date" aria-label="From date" value={from} onChange={(e) => setFrom(e.target.value)} className={field} />
-            <span className="text-sm text-muted">to</span>
-            <input type="date" aria-label="To date" value={to} onChange={(e) => setTo(e.target.value)} className={field} />
+      <section className={`${card} overflow-hidden`}>
+        <div className="border-b border-hairline p-6 dark:border-slate-700">
+          <h3 className="font-display text-xl font-bold text-ink">Works</h3>
+          <p className="mt-1 text-sm text-muted">Expand a Work to see its Tasks, then open a Task to view member uploads.</p>
+        </div>
+        {loading ? (
+          <p className="py-14 text-center text-sm font-medium text-muted">Loading team works...</p>
+        ) : !isMockApi ? (
+          <p className="py-14 text-center text-sm font-medium text-muted">Switch to offline demo mode to explore the sample Work and Task hierarchy.</p>
+        ) : works.length === 0 ? (
+          <p className="py-14 text-center text-sm font-medium text-muted">No Works found.</p>
+        ) : (
+          <div>
+            <div className="hidden grid-cols-[minmax(240px,1.8fr)_120px_140px_90px] gap-4 bg-canvas px-6 py-3 text-xs font-bold uppercase tracking-wide text-muted sm:grid">
+              <span>Work</span><span>Priority</span><span>Status</span><span>Tasks</span>
+            </div>
+            {works.map((work) => (
+              <div key={work.id} className="border-b border-hairline last:border-b-0 dark:border-slate-700">
+                <button
+                  type="button"
+                  aria-expanded={Boolean(openWorks[work.id])}
+                  onClick={() => setOpenWorks((current) => ({ ...current, [work.id]: !current[work.id] }))}
+                  className="grid w-full grid-cols-1 gap-2 px-5 py-4 text-left transition hover:bg-canvas/70 sm:grid-cols-[minmax(240px,1.8fr)_120px_140px_90px] sm:items-center sm:gap-4 sm:px-6"
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    <ChevronDownIcon className={`h-4 w-4 shrink-0 text-muted transition-transform ${openWorks[work.id] ? "" : "-rotate-90"}`} />
+                    <span className="rounded-lg bg-brand-soft px-2 py-1 text-xs font-bold text-ink">{work.key}</span>
+                    <span className="truncate text-sm font-bold text-ink">{work.title}</span>
+                  </span>
+                  <span className="pl-7 text-sm text-ink sm:pl-0">{work.priority}</span>
+                  <span className="pl-7 sm:pl-0"><span className="rounded-full bg-hairline px-3 py-1 text-xs font-semibold text-ink">{work.status}</span></span>
+                  <span className="pl-7 text-xs font-semibold text-muted sm:pl-0">{work.tasks.length} tasks</span>
+                </button>
+
+                {openWorks[work.id] && (
+                  <div className="bg-canvas/60 pb-3 pl-5 pr-4 dark:bg-slate-800/30 sm:pl-12">
+                    {work.tasks.map((task) => (
+                      <div key={task.id} className="border-t border-hairline dark:border-slate-700">
+                        <button
+                          type="button"
+                          aria-expanded={Boolean(openTasks[task.id])}
+                          onClick={() => setOpenTasks((current) => ({ ...current, [task.id]: !current[task.id] }))}
+                          className="grid w-full grid-cols-1 gap-2 py-3 text-left sm:grid-cols-[minmax(220px,1.6fr)_120px_120px] sm:items-center sm:gap-4"
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <ChevronDownIcon className={`h-3.5 w-3.5 shrink-0 text-muted transition-transform ${openTasks[task.id] ? "" : "-rotate-90"}`} />
+                            <span className="rounded-md bg-white px-2 py-1 text-[11px] font-bold text-brand shadow-sm dark:bg-slate-800">{task.key}</span>
+                            <span className="truncate text-sm font-semibold text-ink">{task.title}</span>
+                          </span>
+                          <span className="pl-6 sm:pl-0"><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${task.status === "Done" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{task.status}</span></span>
+                          <span className="pl-6 text-xs font-semibold text-muted sm:pl-0">{task.documents.length} documents</span>
+                        </button>
+
+                        {openTasks[task.id] && (
+                          <div className="mb-3 ml-5 space-y-2 border-l-2 border-brand/40 pl-4 sm:ml-6">
+                            {task.documents.length === 0 ? (
+                              <p className="py-3 text-sm text-muted">No member has uploaded a document for this Task yet.</p>
+                            ) : task.documents.map((document) => (
+                              <article
+                                key={document.id}
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`Preview ${document.title}`}
+                                onClick={() => onPreview(fromApiDocument(document))}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault()
+                                    onPreview(fromApiDocument(document))
+                                  }
+                                }}
+                                className="flex cursor-pointer flex-wrap items-center gap-3 rounded-2xl border border-hairline bg-white p-3 transition hover:border-brand hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-700 dark:bg-slate-900"
+                              >
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-ink dark:bg-brand/15 dark:text-brand"><FileIcon width={17} height={17} /></span>
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-sm font-semibold text-ink">{document.title}</p>
+                                  <p className="truncate text-xs text-muted">{document.fileName} · {document.uploadedBy}</p>
+                                </div>
+                                <span className="rounded-md bg-ink px-2 py-1 text-[10px] font-bold text-white">{document.format}</span>
+                                <div className="w-full sm:w-40"><ProgressBar value={document.progress} tone="ink" /></div>
+                                <span className="text-xs text-muted">{fmtDateTime(document.createdAt)}</span>
+                              </article>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[960px] text-left">
-            <thead>
-              <tr className="text-xs font-semibold tracking-wide text-muted uppercase">
-                <th className="pb-3 pl-2 font-semibold">Member</th>
-                <th className="pb-3 font-semibold">Document</th>
-                <th className="pb-3 font-semibold">Submitted</th>
-                <th className="w-52 pb-3 font-semibold">Progress</th>
-                <th className="pb-3 font-semibold">Status</th>
-                <th className="pb-3 pr-2 text-right font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((r) => (
-                <tr key={r.id} className="border-t border-hairline transition hover:bg-canvas/60 dark:border-slate-700">
-                  <td className="py-4 pl-2">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand text-xs font-bold text-ink">{initials(r.name)}</span>
-                      <span className="text-sm font-semibold whitespace-nowrap text-ink">{r.name}</span>
-                    </div>
-                  </td>
-                  <td className="py-4 pr-4">
-                    <p className="text-sm font-semibold text-ink">{r.title}</p>
-                    <p className="text-xs text-muted">{r.project}</p>
-                  </td>
-                  <td className="py-4 text-sm font-medium whitespace-nowrap text-muted">{fmtDate(r.date)}</td>
-                  <td className="py-4 pr-6"><ProgressBar value={r.progress} tone="ink" /></td>
-                  <td className="py-4"><StatusBadge status={r.status} /></td>
-                  <td className="py-4 pr-2">
-                    <div className="flex justify-end gap-2">
-                      <button onClick={() => setFeedback(r)} className="h-9 rounded-xl border border-hairline px-3 text-xs font-semibold whitespace-nowrap text-ink transition hover:bg-hairline dark:border-slate-700 dark:hover:bg-slate-700">Review &amp; Feedback</button>
-                      <button disabled={r.status === "Approved"} onClick={() => setStatus(r.id, "Approved")} className="h-9 rounded-xl bg-brand px-3 text-xs font-bold text-ink transition hover:brightness-95 disabled:opacity-40">Approve</button>
-                      <button onClick={() => {
-                        const url = URL.createObjectURL(new Blob([r.title], { type: "text/plain" }))
-                        Object.assign(document.createElement("a"), { href: url, download: `${r.title}.txt` }).click()
-                        URL.revokeObjectURL(url)
-                      }} className="h-9 rounded-xl px-3 text-xs font-semibold text-muted transition hover:bg-hairline hover:text-ink dark:hover:bg-slate-700">Download</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {visible.length === 0 && <p className="py-16 text-center text-sm font-medium text-muted">No submissions match your filters.</p>}
-        </div>
+        )}
       </section>
-
-      {feedback && (
-        <FeedbackModal
-          item={feedback}
-          onClose={() => setFeedback(null)}
-          onSend={() => {
-            setStatus(feedback.id, "Needs Revision")
-            setFeedback(null)
-          }}
-        />
-      )}
     </div>
   )
 }
@@ -689,9 +687,11 @@ export default function Documents() {
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState("")
   const [modal, setModal] = useState(null)
+  const [teamRefresh, setTeamRefresh] = useState(0)
 
-  const [viewing, setViewing] = useState(null)
-  const viewDoc = docs.find((d) => d.id === viewing)
+  const [preview, setPreview] = useState(null)
+  const viewDoc = preview?.doc
+  const setViewing = (doc) => setPreview(doc ? { doc } : null)
 
   useEffect(() => {
     let active = true
@@ -716,6 +716,10 @@ export default function Documents() {
     form.append("progress", String(value.progress))
     form.append("start", new Date(value.start).toISOString())
     form.append("deadline", new Date(value.deadline).toISOString())
+    if (isMockApi) {
+      form.append("workId", value.workId)
+      form.append("taskId", value.taskId)
+    }
     if (value.file) {
       form.append("file", value.file)
     }
@@ -728,6 +732,7 @@ export default function Documents() {
       setDocs((current) => modal.mode === "upload"
         ? [saved, ...current]
         : current.map((document) => document.id === saved.id ? saved : document))
+      setTeamRefresh((current) => current + 1)
       setModal(null)
     } catch (error) {
       throw new Error(getApiErrorMessage(error, "Could not save this document."))
@@ -735,9 +740,7 @@ export default function Documents() {
   }
 
   const onAction = async (action, doc) => {
-    if (action === "Update %") {
-      setViewing(doc.id)
-    } else if (action === "Edit") {
+    if (action === "Edit") {
       setModal({ mode: "edit", doc })
     } else if (action === "Delete") {
       if (!window.confirm(`Delete "${doc.title}"? This cannot be undone.`)) return
@@ -745,7 +748,7 @@ export default function Documents() {
       try {
         await api.delete(`/documents/${doc.id}`)
         setDocs((current) => current.filter((item) => item.id !== doc.id))
-        if (viewing === doc.id) setViewing(null)
+        if (preview?.doc.id === doc.id) setViewing(null)
       } catch (error) {
         setPageError(getApiErrorMessage(error, "Could not delete this document."))
       }
@@ -755,17 +758,6 @@ export default function Documents() {
       } catch (error) {
         setPageError(getApiErrorMessage(error, "Could not download this document."))
       }
-    }
-  }
-
-  const setProgress = async (id, progress) => {
-    setPageError("")
-    try {
-      const { data } = await api.patch(`/documents/${id}/progress`, { progress })
-      const updated = fromApiDocument(data)
-      setDocs((current) => current.map((document) => document.id === id ? updated : document))
-    } catch (error) {
-      setPageError(getApiErrorMessage(error, "Could not update document progress."))
     }
   }
 
@@ -810,9 +802,9 @@ export default function Documents() {
         loading
           ? <p className="py-16 text-center text-sm font-medium text-muted">Loading documents...</p>
           : <MyDocuments docs={docs} onAction={onAction} setModal={setModal} setViewing={setViewing} />
-      ) : <TeamReports />}
+      ) : <TeamReports refreshKey={teamRefresh} onPreview={setViewing} />}
 
-      {viewDoc && <Viewer doc={viewDoc} onClose={() => setViewing(null)} onProgress={setProgress} onDownload={onAction.bind(null, "Download")} />}
+      {viewDoc && <Viewer key={viewDoc.id} doc={viewDoc} onClose={() => setViewing(null)} onDownload={onAction.bind(null, "Download")} />}
       {modal && <DocModal key={modal.mode + (modal.doc?.id ?? "")} mode={modal.mode} doc={modal.doc} onClose={() => setModal(null)} onSave={save} />}
     </div>
   )
