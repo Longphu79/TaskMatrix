@@ -1,19 +1,16 @@
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
+using TaskMatrix.Api.DTOs;
 
 namespace TaskMatrix.Api.Services;
-
-public class TaskVerificationResult
-{
-    public bool IsCompleted { get; set; }
-    public string Reasoning { get; set; } = string.Empty;
-}
 
 public class VisionService
 {
     private readonly HttpClient _httpClient;
     private readonly string _apiKey;
+
+    private static readonly Uri GroqEndpointUri = new Uri("https://api.groq.com/openai/v1/chat/completions", UriKind.Absolute);
 
     public VisionService(HttpClient httpClient, IConfiguration config)
     {
@@ -21,24 +18,67 @@ public class VisionService
         _apiKey = config["Groq:ApiKey"] ?? throw new ArgumentNullException("Thiếu Groq API Key trong appsettings.json");
     }
 
-    public async Task<TaskVerificationResult?> VerifyTaskProofAsync(string taskTitle, string taskDescription, IFormFile imageFile)
+    public async Task<AiProofResultDto?> VerifyTaskProofAsync(
+        string taskTitle,
+        string taskDescription,
+        int currentProgress,
+        IFormFile imageFile,
+        string? userNotes = null)
     {
         if (imageFile == null || imageFile.Length == 0) return null;
 
+        // 1. Đọc file ảnh sang Byte Array
         using var ms = new MemoryStream();
         await imageFile.CopyToAsync(ms);
-        var base64Image = Convert.ToBase64String(ms.ToArray());
+        var imageBytes = ms.ToArray();
+
+        // 🟢 2. Chuẩn hóa Base64: Loại bỏ ký tự xuống dòng thừa (nếu có)
+        string base64Image = Convert.ToBase64String(imageBytes).Replace("\r", "").Replace("\n", "");
+
+        // 🟢 3. Xác định MIME type chuẩn (fallback về image/jpeg nếu ContentType bị trống)
+        string mimeType = "image/jpeg";
+        if (!string.IsNullOrWhiteSpace(imageFile.ContentType) && imageFile.ContentType.Contains('/'))
+        {
+            mimeType = imageFile.ContentType.ToLower();
+        }
+        else
+        {
+            // Tự suy luận extension nếu ContentType không có
+            var ext = Path.GetExtension(imageFile.FileName).ToLower();
+            mimeType = ext switch
+            {
+                ".png" => "image/png",
+                ".webp" => "image/webp",
+                ".gif" => "image/gif",
+                _ => "image/jpeg"
+            };
+        }
+
+        // 🟢 4. Ghép thành chuỗi Data URI chuẩn tuyệt đối
+        string imageDataUrl = $"data:{mimeType};base64,{base64Image}";
 
         var prompt = $@"
-Công việc cần thực hiện:
+Bạn là AI kiểm định bằng chứng hoàn thành công việc của hệ thống TaskMatrix.
+
+THÔNG TIN CÔNG VIỆC:
 - Tiêu đề: {taskTitle}
 - Mô tả: {taskDescription}
+- Tiến độ người dùng khai báo: {currentProgress}%
+- Ghi chú/Lời nhắn từ người dùng: {(string.IsNullOrWhiteSpace(userNotes) ? "Không có" : userNotes)}
 
-Hãy phân tích bức ảnh và xác nhận xem đây có phải là bằng chứng hợp lệ cho thấy công việc đã hoàn thành hay không.
-Trả về định dạng JSON thuần túy có cấu trúc:
+NHIỆM VỤ CỦA BẠN:
+1. Quan sát kỹ bức ảnh minh chứng người dùng gửi lên.
+2. Đánh giá xem ảnh có phải là bằng chứng hợp lệ cho công việc này hay không.
+3. Đánh giá mức độ hoàn thành (% tiến độ thực tế từ 0 đến 100%).
+
+BẮT BUỘC TRẢ VỀ DẠNG JSON THUẦN TÚY KHÔNG BỌC MARKDOWN:
 {{
-  ""isCompleted"": true hoặc false,
-  ""reasoning"": ""Giải thích ngắn gọn bằng tiếng Việt lý do chấp nhận hoặc từ chối.""
+  ""ok"": true/false (true nếu bằng chứng hợp lệ và thể hiện công việc đạt tiến độ),
+  ""aiStatus"": ""verified"" (nếu đạt 100%) | ""needs"" (nếu đạt một phần) | ""feedback"" (nếu ảnh không hợp lệ/bị từ chối),
+  ""reasoning"": ""Giải thích ngắn gọn, rõ ràng bằng tiếng Việt lý do đánh giá."",
+  ""feedback"": ""Góp ý hoặc yêu cầu bổ sung nếu chưa đạt."",
+  ""partial"": true/false (true nếu hoàn thành 1 phần, false nếu 100% hoặc từ chối),
+  ""progress"": Số nguyên từ 0 đến 100
 }}
 ";
 
@@ -59,15 +99,16 @@ Trả về định dạng JSON thuần túy có cấu trúc:
                             type = "image_url",
                             image_url = new
                             {
-                                url = $"data:{imageFile.ContentType};base64,{base64Image}"
+                                url = imageDataUrl
                             }
                         }
                     }
                 }
-            }
+            },
+            temperature = 0.2
         };
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.groq.com/openai/v1/chat/completions");
+        using var request = new HttpRequestMessage(HttpMethod.Post, GroqEndpointUri);
         request.Headers.Add("Authorization", $"Bearer {_apiKey}");
         request.Headers.Add("User-Agent", "TaskMatrix/1.0");
         request.Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
@@ -88,7 +129,7 @@ Trả về định dạng JSON thuần túy có cấu trúc:
 
                 if (string.IsNullOrEmpty(content)) return null;
 
-                return JsonSerializer.Deserialize<TaskVerificationResult>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                return JsonSerializer.Deserialize<AiProofResultDto>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             }
 
             Console.WriteLine($"[Groq VisionService Error]: {jsonResponse}");
@@ -98,10 +139,14 @@ Trả về định dạng JSON thuần túy có cấu trúc:
             Console.WriteLine($"[Groq VisionService Exception]: {ex.Message}");
         }
 
-        return new TaskVerificationResult
+        return new AiProofResultDto
         {
-            IsCompleted = false,
-            Reasoning = "Không thể kết nối với máy chủ AI Vision lúc này."
+            Ok = false,
+            AiStatus = "feedback",
+            Reasoning = "Không thể kết nối hoặc phân tích ảnh qua máy chủ AI Vision lúc này.",
+            Feedback = "Vui lòng kiểm tra lại định dạng ảnh và gửi lại.",
+            Partial = false,
+            Progress = currentProgress
         };
     }
 }

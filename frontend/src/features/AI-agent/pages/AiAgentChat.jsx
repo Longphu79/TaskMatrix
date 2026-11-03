@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { SparkleIcon } from "../components/icon";
-import { useTasks } from "../context/TaskContext";
-import apiClient from "../services/apiClient";
+import { SparkleIcon } from "../../../components/icon";
+import { useTasks } from "../../../context/TaskContext";
+import { aiApi } from "../api/aiApi"; // 🟢 Import aiApi vừa tạo
 
 export default function AiAgentChat() {
     const { fetchTasks } = useTasks();
@@ -20,10 +20,11 @@ export default function AiAgentChat() {
         loadChatHistory();
     }, []);
 
+    // 🟢 Gọi qua aiApi.getHistory()
     const loadChatHistory = async () => {
         try {
             setFetchingHistory(true);
-            const res = await apiClient.get("/aiagent/history");
+            const res = await aiApi.getHistory();
             if (Array.isArray(res) && res.length > 0) {
                 const historyMsgs = res.map((msg, index) => ({
                     id: msg.id || index,
@@ -54,10 +55,11 @@ export default function AiAgentChat() {
         }
     };
 
+    // 🟢 Gọi qua aiApi.clearHistory()
     const handleConfirmReset = async () => {
         setResetting(true);
         try {
-            await apiClient.delete("/aiagent/history");
+            await aiApi.clearHistory();
             setMessages([
                 {
                     id: 0,
@@ -77,6 +79,7 @@ export default function AiAgentChat() {
         end.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     }, [messages, loading]);
 
+    // 🟢 Gọi qua aiApi.parseAndCreate(...)
     const send = async (text) => {
         if (!text.trim() || loading) return;
 
@@ -90,12 +93,11 @@ export default function AiAgentChat() {
         setLoading(true);
 
         try {
-            const res = await apiClient.post("/aiagent/parse-and-create", {
+            const res = await aiApi.parseAndCreate({
                 prompt: userText,
                 userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             });
 
-            // 🟢 TỰ ĐỘNG TẢI LẠI LỊCH / TASKS KHI CREATE, UPDATE HOẶC DELETE
             const isTaskAction = [
                 "CREATE_TASK",
                 "UPDATE_TASK",
@@ -111,7 +113,6 @@ export default function AiAgentChat() {
                 },
             ]);
 
-            // Gọi fetchTasks để UI cập nhật ngay lập tức
             if (isTaskAction && fetchTasks) {
                 await fetchTasks();
             }

@@ -5,12 +5,11 @@ import {
     useEffect,
     useCallback,
 } from "react";
-import apiClient from "../services/apiClient";
+import { taskApi } from "../features/Task/api/taskApi"; // Chỉnh lại đường dẫn import tương ứng với thư mục của bạn
 import { useWorkspace } from "./WorkspaceContext";
 
 const TaskContext = createContext(null);
 
-// Hàm chuẩn hóa dữ liệu (xử lý cả PascalCase lẫn camelCase từ .NET)
 function normalizeTask(t) {
     if (!t) return null;
     return {
@@ -23,6 +22,11 @@ function normalizeTask(t) {
         description: t.description || t.Description || "",
         priority: t.priority || t.Priority || "Medium",
         status: t.status || t.Status || "Todo",
+        progress: t.progress ?? t.Progress ?? 0,
+        aiVerificationReason:
+            t.aiVerificationReason || t.AiVerificationReason || "",
+        proofImageUrl: t.proofImageUrl || t.ProofImageUrl || "",
+        aiStatus: t.aiStatus || t.AiStatus || null,
         dueDate: t.dueDate || t.DueDate,
         startTime: t.startTime || t.StartTime,
         endTime: t.endTime || t.EndTime,
@@ -35,19 +39,15 @@ export function TaskProvider({ children }) {
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // 1. Lấy danh sách Tasks từ DB
+    // 1. Lấy danh sách Tasks
     const fetchTasks = useCallback(async () => {
         setLoading(true);
         try {
-            // apiClient đã unwrap sẵn response.data, nên res ở đây chính là Array
-            const res = await apiClient.get("/tasks");
+            const res = await taskApi.getTasks();
             const rawList = Array.isArray(res) ? res : [];
-
-            const cleanTasks = rawList.map(normalizeTask).filter(Boolean);
-            console.log("Tasks từ DB sau khi chuẩn hóa:", cleanTasks);
-            setTasks(cleanTasks);
+            setTasks(rawList.map(normalizeTask).filter(Boolean));
         } catch (err) {
-            console.error("Lỗi khi tải danh sách Tasks từ DB:", err);
+            console.error("Lỗi khi tải danh sách Tasks:", err);
             setTasks([]);
         } finally {
             setLoading(false);
@@ -86,15 +86,14 @@ export function TaskProvider({ children }) {
                     : "",
                 priority: formData.priority || "Medium",
                 status: "Todo",
+                progress: 0,
                 dueDate: dueISO,
                 startTime: startISO,
                 endTime: endISO,
                 workspaceId: currentWorkspace?.id || "personal",
             };
 
-            // res ở đây chính là object Task vừa tạo
-            const createdData = await apiClient.post("/tasks", payload);
-
+            const createdData = await taskApi.createTask(payload);
             if (createdData) {
                 const newTask = normalizeTask(createdData);
                 setTasks((prev) => [newTask, ...prev.filter(Boolean)]);
@@ -106,35 +105,63 @@ export function TaskProvider({ children }) {
         }
     };
 
-    // 3. Toggle trạng thái
+    // 3. Cập nhật Task
+    const updateTask = async (taskId, patch) => {
+        try {
+            const res = await taskApi.updateTask(taskId, patch);
+            const updatedTask =
+                normalizeTask(res) || normalizeTask({ ...patch, id: taskId });
+
+            setTasks((prev) =>
+                prev.map((t) =>
+                    t?.id === taskId ? { ...t, ...updatedTask } : t,
+                ),
+            );
+            return updatedTask;
+        } catch (err) {
+            console.error("Lỗi khi cập nhật Task:", err);
+            fetchTasks();
+            throw err;
+        }
+    };
+
+    // 4. Đổi trạng thái Hoàn thành / Chưa hoàn thành
     const toggleTask = async (taskId) => {
         const target = tasks.find((t) => t?.id === taskId);
         if (!target) return;
 
-        const newStatus = target.status === "Completed" ? "Todo" : "Completed";
+        const isNowCompleted = target.status !== "Completed";
+        const newStatus = isNowCompleted ? "Completed" : "Todo";
 
+        // 🟢 Khi tick thành công -> 100%. Khi bỏ tick -> Reset về 0%
+        const newProgress = isNowCompleted ? 100 : 0;
+
+        // Optimistic UI update
         setTasks((prev) =>
             prev.map((t) =>
-                t?.id === taskId ? { ...t, status: newStatus } : t,
+                t?.id === taskId
+                    ? { ...t, status: newStatus, progress: newProgress }
+                    : t,
             ),
         );
 
         try {
-            await apiClient.put(`/tasks/${taskId}`, {
+            await taskApi.updateTask(taskId, {
                 ...target,
                 status: newStatus,
+                progress: newProgress,
             });
         } catch (err) {
-            console.error("Lỗi cập nhật Task:", err);
+            console.error("Lỗi toggle Task:", err);
             fetchTasks();
         }
     };
 
-    // 4. Xóa Task
+    // 5. Xóa Task
     const deleteTask = async (taskId) => {
         setTasks((prev) => prev.filter((t) => t?.id !== taskId));
         try {
-            await apiClient.delete(`/tasks/${taskId}`);
+            await taskApi.deleteTask(taskId);
         } catch (err) {
             console.error("Lỗi xóa Task:", err);
             fetchTasks();
@@ -148,6 +175,7 @@ export function TaskProvider({ children }) {
                 loading,
                 fetchTasks,
                 addTask,
+                updateTask,
                 toggleTask,
                 deleteTask,
             }}
