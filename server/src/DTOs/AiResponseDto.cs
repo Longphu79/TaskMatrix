@@ -25,3 +25,14 @@ public class ParsedTaskDto
     public DateTime? StartTime { get; set; }
     public DateTime? EndTime { get; set; }
 }
+
+public class AiProofResultDto
+{
+    public bool Ok { get; set; }
+    public string AiStatus { get; set; } = "feedback";
+    public string? Reasoning { get; set; }
+    public string? Feedback { get; set; }
+    public bool Partial { get; set; }
+    public int Progress { get; set; }
+    public string? ProofImageUrl { get; set; }
+}

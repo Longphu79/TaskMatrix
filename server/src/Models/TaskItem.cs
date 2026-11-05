@@ -3,6 +3,7 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace TaskMatrix.Api.Models;
 
+[BsonIgnoreExtraElements]
 public class TaskItem
 {
     [BsonId]
@@ -14,14 +15,18 @@ public class TaskItem
     [BsonRepresentation(BsonType.ObjectId)]
     public string UserId { get; set; } = string.Empty;
 
-    // Workspace chứa Task (Cá nhân hoặc Công ty)
+    // Workspace chứa Task (Cá nhân "personal" hoặc ID của Workspace Công ty)
     [BsonElement("workspaceId")]
     public string WorkspaceId { get; set; } = "personal";
 
-    // Người được giao Task (Dành cho Workspace Công ty)
-    [BsonElement("assignedTo")]
+    // Danh sách thành viên được giao làm Task (dành cho Workspace Công ty / Dự án)
+    [BsonElement("assigneeIds")]
     [BsonRepresentation(BsonType.ObjectId)]
-    public string? AssignedTo { get; set; }
+    public List<string> AssigneeIds { get; set; } = new();
+
+    // Dự án / Phân loại (Ví dụ: "Food Dashboard", "Matrix Domain")
+    [BsonElement("project")]
+    public string? Project { get; set; }
 
     [BsonElement("title")]
     public string Title { get; set; } = string.Empty;
@@ -29,13 +34,17 @@ public class TaskItem
     [BsonElement("description")]
     public string? Description { get; set; }
 
-    // Low | Medium | High | Urgent
+    // Priority: Low | Medium | High | Urgent
     [BsonElement("priority")]
     public string Priority { get; set; } = "Medium";
 
-    // Todo | InProgress | Completed | Cancelled
+    // Status: Todo | Pending | InProgress | Completed | Cancelled
     [BsonElement("status")]
-    public string Status { get; set; } = "Todo";
+    public string Status { get; set; } = "Pending";
+
+    // Tiến độ hoàn thành công việc (0 - 100%)
+    [BsonElement("progress")]
+    public int Progress { get; set; } = 0;
 
     // --- QUẢN LÝ THỜI GIAN & TIMESHEETS ---
 
@@ -43,7 +52,7 @@ public class TaskItem
     [BsonElement("dueDate")]
     public DateTime? DueDate { get; set; }
 
-    // Giờ bắt đầu & Kết thúc dự kiến (phục vụ Timesheets & AI Scheduling)
+    // Giờ bắt đầu & Kết thúc dự kiến (Timesheets & AI Scheduling)
     [BsonElement("startTime")]
     public DateTime? StartTime { get; set; }
 
@@ -63,9 +72,20 @@ public class TaskItem
     public bool IsReminderSent { get; set; } = false;
 
     // --- BẰNG CHỨNG CÔNG VIỆC (AI AGENT VERIFICATION) ---
+
+    // Đã được AI xác nhận chưa: "verified" | "needs" | "feedback" | null
+    [BsonElement("aiStatus")]
+    public string? AiStatus { get; set; }
+
+    // Link/tên file ảnh bằng chứng upload
     [BsonElement("proofImageUrl")]
     public string? ProofImageUrl { get; set; }
 
+    // Lời nhắn / Ghi chú của User gửi cho AI
+    [BsonElement("aiNotes")]
+    public string? AiNotes { get; set; }
+
+    // Phản hồi / Lý do giải thích từ AI (Duyệt hoặc Yêu cầu bổ sung)
     [BsonElement("aiVerificationReason")]
     public string? AiVerificationReason { get; set; }
 

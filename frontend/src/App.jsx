@@ -17,7 +17,7 @@ import ReportPage from "./pages/Report";
 import SettingsPage from "./pages/Settings";
 import ChatPage from "./pages/Chat";
 import ManageMembers from "./pages/ManageMembers";
-import AiAgentChat from "./pages/AiAgentChat"; // Hoặc đường dẫn file AiAgentChat của bạn
+import AiAgentChat from "./features/AI-agent/pages/AiAgentChat"; // Hoặc đường dẫn file AiAgentChat của bạn
 
 // Auth Pages
 import LoginPage from "./features/auth/pages/Login";

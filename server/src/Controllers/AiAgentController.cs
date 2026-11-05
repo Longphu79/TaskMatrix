@@ -149,45 +149,70 @@ public class AiAgentController : ControllerBase
     }
 
     [HttpPost("verify-completion/{taskId}")]
-    public async Task<IActionResult> VerifyTaskCompletion(string taskId, IFormFile proofImage)
+    public async Task<IActionResult> VerifyTaskCompletion(string taskId, [FromForm] VerifyProofRequestDto request)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrEmpty(userId)) return Unauthorized();
 
-        if (proofImage == null || proofImage.Length == 0)
-            return BadRequest("Vui lòng tải lên hình ảnh minh chứng.");
+        if (request.ProofImage == null || request.ProofImage.Length == 0)
+        {
+            return BadRequest(new AiProofResultDto
+            {
+                Ok = false,
+                AiStatus = "feedback",
+                Reasoning = "Chưa nhận được file ảnh minh chứng.",
+                Feedback = "Vui lòng chọn hoặc chụp ảnh bằng chứng hoàn thành công việc."
+            });
+        }
 
         var task = await _taskService.GetTaskByIdAsync(taskId);
         if (task == null) return NotFound("Không tìm thấy công việc cần xác minh.");
 
-        var result = await _visionService.VerifyTaskProofAsync(task.Title, task.Description ?? "", proofImage);
-        if (result == null) return BadRequest("Không thể phân tích hình ảnh minh chứng.");
+        // Gọi AI Vision phân tích ảnh
+        var aiResult = await _visionService.VerifyTaskProofAsync(
+            task.Title,
+            task.Description ?? "",
+            request.ClaimedProgress ?? task.Progress,
+            request.ProofImage,
+            request.UserNotes
+        );
 
-        task.AiVerificationReason = result.Reasoning;
+        if (aiResult == null) return BadRequest("Không thể phân tích hình ảnh minh chứng.");
 
-        if (result.IsCompleted)
+        // Luôn ghi lại lý do nhận xét từ AI
+        task.AiVerificationReason = aiResult.Reasoning;
+        if (!string.IsNullOrEmpty(aiResult.ProofImageUrl))
         {
-            task.Status = "Completed";
-            task.CompletedAt = DateTime.UtcNow;
-
-            await _taskService.UpdateTaskAsync(taskId, userId, task);
-
-            return Ok(new
-            {
-                success = true,
-                message = "AI đã xác thực thành công! Đã chuyển trạng thái Task sang Completed.",
-                reasoning = result.Reasoning,
-                task = task
-            });
+            task.ProofImageUrl = aiResult.ProofImageUrl;
         }
 
+        // 🟢 CHỈ TĂNG/CẬP NHẬT PROGRESS KHI AI CHẤM ĐẠT (aiResult.Ok == true)
+        if (aiResult.Ok)
+        {
+            // Ưu tiên % AI chấm, nếu không có thì lấy % người dùng đề xuất
+            int newProgress = aiResult.Progress > 0 ? aiResult.Progress : (request.ClaimedProgress ?? 100);
+            task.Progress = Math.Clamp(newProgress, 0, 100);
+            task.AiStatus = "verified";
+
+            if (task.Progress >= 100)
+            {
+                task.Status = "Completed";
+                task.CompletedAt = DateTime.UtcNow;
+            }
+            else if (task.Progress > 0)
+            {
+                task.Status = "InProgress";
+            }
+        }
+        else
+        {
+            // Khi AI từ chối: Giữ nguyên task.Progress và task.Status cũ trong DB
+            task.AiStatus = "feedback";
+        }
+
+        // Lưu thay đổi vào MongoDB
         await _taskService.UpdateTaskAsync(taskId, userId, task);
 
-        return Ok(new
-        {
-            success = false,
-            message = "AI từ chối bằng chứng hoàn thành.",
-            reasoning = result.Reasoning
-        });
+        return Ok(aiResult);
     }
 }

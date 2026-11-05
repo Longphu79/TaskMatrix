@@ -240,3 +240,91 @@ export function UsersIcon(p) {
         </svg>
     );
 }
+
+export function PlusIcon(p) {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            width={18}
+            height={18}
+            {...p}
+        >
+            <path d="M12 5v14M5 12h14" />
+        </svg>
+    );
+}
+
+export function CalendarIcon(p) {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            width={15}
+            height={15}
+            {...p}
+        >
+            <rect x="3" y="4" width="18" height="17" rx="2" />
+            <path d="M3 9h18M8 2v4M16 2v4" />
+        </svg>
+    );
+}
+
+export function CheckIcon(p) {
+    return (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" {...p}>
+            <path
+                d="m5 13 4 4L19 7"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+        </svg>
+    );
+}
+
+export function ClockSmallIcon(p) {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            width={15}
+            height={15}
+            {...p}
+        >
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3 2" />
+        </svg>
+    );
+}
+
+export function UploadIcon(props) {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.9"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            width={16}
+            height={16}
+            {...props}
+        >
+            <path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />
+        </svg>
+    );
+}

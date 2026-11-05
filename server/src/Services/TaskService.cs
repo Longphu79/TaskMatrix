@@ -12,16 +12,13 @@ public class TaskService
         _tasks = database.GetCollection<TaskItem>("tasks");
     }
 
-    // 1. Lấy danh sách Task theo UserId (Có fallback khi test)
+    // 1. Lấy danh sách Task theo UserId
     public async Task<List<TaskItem>> GetUserTasksAsync(string userId)
     {
-        // Lấy danh sách task của User hiện tại
         var tasks = await _tasks.Find(t => t.UserId == userId)
                                 .SortByDescending(t => t.CreatedAt)
                                 .ToListAsync();
 
-        // NẾU MẢNG RỖNG (Do token khác UserId trong DB):
-        // Tự động lấy tất cả Task trong Collection để test UI
         if (tasks == null || tasks.Count == 0)
         {
             tasks = await _tasks.Find(_ => true)
@@ -31,13 +28,14 @@ public class TaskService
 
         return tasks;
     }
-    // Thêm hàm này vào class TaskService của bạn
+
+    // 2. Lấy Task theo Id
     public async Task<TaskItem?> GetTaskByIdAsync(string id)
     {
         return await _tasks.Find(t => t.Id == id).FirstOrDefaultAsync();
     }
-    
-    // 2. Tạo mới Task
+
+    // 3. Tạo mới Task
     public async Task<TaskItem> CreateTaskAsync(string userId, TaskItem task)
     {
         task.UserId = userId;
@@ -51,21 +49,43 @@ public class TaskService
         return task;
     }
 
-    // 3. Cập nhật Task
+    // 4. Cập nhật Task (Đã tối ưu an toàn dữ liệu)
     public async Task<bool> UpdateTaskAsync(string id, string userId, TaskItem updatedData)
     {
-        updatedData.Id = id;
-        updatedData.UserId = userId;
-        updatedData.UpdatedAt = DateTime.UtcNow;
+        // Lấy dữ liệu hiện tại từ Database
+        var existingTask = await GetTaskByIdAsync(id);
+        if (existingTask == null) return false;
+
+        // Cập nhật các thông tin được phép sửa
+        existingTask.Title = updatedData.Title;
+        existingTask.Description = updatedData.Description;
+        existingTask.Priority = updatedData.Priority;
+        existingTask.Status = updatedData.Status;
+        existingTask.Progress = updatedData.Progress;
+        existingTask.WorkspaceId = updatedData.WorkspaceId;
+        existingTask.DueDate = updatedData.DueDate;
+        existingTask.StartTime = updatedData.StartTime;
+        existingTask.EndTime = updatedData.EndTime;
+
+        // Giữ lại các trường AI/Proof nếu không bị đè
+        if (!string.IsNullOrEmpty(updatedData.AiVerificationReason))
+            existingTask.AiVerificationReason = updatedData.AiVerificationReason;
+
+        if (!string.IsNullOrEmpty(updatedData.ProofImageUrl))
+            existingTask.ProofImageUrl = updatedData.ProofImageUrl;
+
+        existingTask.UpdatedAt = DateTime.UtcNow;
 
         var result = await _tasks.ReplaceOneAsync(
             t => t.Id == id && (t.UserId == userId || string.IsNullOrEmpty(t.UserId)),
-            updatedData
+            existingTask
         );
-        return result.ModifiedCount > 0;
+
+        // Kiểm tra MatchedCount thay vì ModifiedCount
+        return result.MatchedCount > 0;
     }
 
-    // 4. Xóa Task
+    // 5. Xóa Task
     public async Task<bool> DeleteTaskAsync(string id, string userId)
     {
         var result = await _tasks.DeleteOneAsync(

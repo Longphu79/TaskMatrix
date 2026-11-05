@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { toISODate, timeToHours, useTasks } from "../context/TaskContext";
+import { useWorkspace } from "../context/WorkspaceContext"; // 🟢 Import Workspace Context thực tế
 
 const INPUT_CLS =
     "w-full rounded-xl border border-hairline bg-white px-4 py-2.5 text-sm text-ink outline-none transition placeholder:text-muted focus:border-brand dark:bg-slate-800 dark:border-slate-700/50 dark:text-white";
@@ -20,24 +21,29 @@ function Field({ label, htmlFor, children }) {
 
 export default function AddTaskModal({ onClose, defaultDate, onAdded }) {
     const { tasks, addTask } = useTasks();
+    const { currentWorkspace, workspaces } = useWorkspace(); // 🟢 Lấy danh sách Workspace thật của User
+
     const [form, setForm] = useState({
         title: "",
-        project: "",
+        workspaceId: currentWorkspace?.id || "personal", // 🟢 Lấy Workspace hiện tại làm mặc định
         priority: "Medium",
         dueDate: defaultDate ?? toISODate(new Date()),
         startTime: "09:00",
         endTime: "11:00",
     });
+
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
-    const projects = useMemo(
-        () =>
-            [...new Set(tasks.map((t) => t.project || t.workspaceId))]
-                .filter(Boolean)
-                .sort(),
-        [tasks],
-    );
+    // 🟢 Quét danh sách Project / Workspace THẬT mà người dùng thuộc về
+    const availableProjects = useMemo(() => {
+        const fromWorkspaces = (workspaces || []).map((w) => w.id || w.name);
+        const fromTasks = (tasks || []).map((t) => t.workspaceId || t.project);
+        const combined = [
+            ...new Set([...fromWorkspaces, ...fromTasks, "personal"]),
+        ].filter(Boolean);
+        return combined.sort();
+    }, [workspaces, tasks]);
 
     const set = (key) => (e) => {
         setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -46,26 +52,69 @@ export default function AddTaskModal({ onClose, defaultDate, onAdded }) {
 
     const submit = async (e) => {
         e.preventDefault();
+
+        // 1. Validate các trường bắt buộc
         if (!form.title.trim()) return setError("Please enter a task title.");
         if (!form.dueDate) return setError("Please choose a due date.");
         if (!form.startTime || !form.endTime)
             return setError("Please set a start and end time.");
-        if (
-            timeToHours(form.endTime, { isEnd: true }) <=
-            timeToHours(form.startTime)
-        ) {
-            return setError("End time must be after start time.");
+
+        // 2. Chuyển HH:mm sang số giờ để so sánh
+        const startH = timeToHours(form.startTime);
+        const endH = timeToHours(form.endTime, { isEnd: true });
+
+        if (endH <= startH) {
+            setError("End time must be after start time.");
+            return; // 🟢 THÊM RETURN ĐỂ CHẶN KHÔNG CHO TẠO TASK BỊ LỖI
+        }
+
+        // 3. Ràng buộc thời gian quá khứ nếu chọn ngày Hôm Nay
+        const todayStr = toISODate(new Date());
+        if (form.dueDate === todayStr) {
+            const now = new Date();
+            const currentHours = now.getHours() + now.getMinutes() / 60;
+            if (startH < currentHours) {
+                setError("Start time cannot be in the past for today's tasks.");
+                return; // 🟢 THÊM RETURN ĐỂ CHẶN KHÔNG CHO TẠO TASK BỊ LỖI
+            }
         }
 
         setLoading(true);
+        setError("");
+
         try {
-            // Gọi hàm addTask từ TaskContext (Đã dùng Axios gửi API POST)
-            const createdTask = await addTask(form);
+            // 🟢 Hàm ghép ngày + giờ chuẩn địa phương (Local ISO String)
+            const createLocalISO = (dateStr, timeStr) => {
+                if (!dateStr || !timeStr) return null;
+                const [year, month, day] = dateStr.split("-").map(Number);
+                const [hours, minutes] = timeStr.split(":").map(Number);
+                // Tạo đối tượng Date theo giờ máy tính local
+                const localDate = new Date(
+                    year,
+                    month - 1,
+                    day,
+                    hours,
+                    minutes,
+                    0,
+                );
+                return localDate.toISOString();
+            };
+
+            const payload = {
+                title: form.title.trim(),
+                workspaceId: form.workspaceId,
+                priority: form.priority,
+                dueDate: createLocalISO(form.dueDate, "00:00"),
+                startTime: createLocalISO(form.dueDate, form.startTime),
+                endTime: createLocalISO(form.dueDate, form.endTime),
+            };
+
+            const createdTask = await addTask(payload);
             onAdded?.(createdTask);
             onClose();
         } catch (err) {
             console.error("Failed to add task:", err);
-            setError("Lỗi kết nối Server hoặc không thể tạo task.");
+            setError("Server connection error or invalid request format.");
         } finally {
             setLoading(false);
         }
@@ -73,7 +122,7 @@ export default function AddTaskModal({ onClose, defaultDate, onAdded }) {
 
     return (
         <div
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
             onClick={onClose}
         >
             <form
@@ -126,21 +175,25 @@ export default function AddTaskModal({ onClose, defaultDate, onAdded }) {
                     </Field>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <Field label="Project" htmlFor="task-project">
-                            <input
+                        {/* 🟢 Select danh sách Workspace / Project THẬT của User */}
+                        <Field
+                            label="Project / Workspace"
+                            htmlFor="task-project"
+                        >
+                            <select
                                 id="task-project"
-                                list="task-projects"
-                                value={form.project}
-                                onChange={set("project")}
-                                placeholder="e.g. Matrix Domain"
+                                value={form.workspaceId}
+                                onChange={set("workspaceId")}
                                 className={INPUT_CLS}
-                            />
-                            <datalist id="task-projects">
-                                {projects.map((p) => (
-                                    <option key={p} value={p} />
+                            >
+                                {availableProjects.map((p) => (
+                                    <option key={p} value={p}>
+                                        {p}
+                                    </option>
                                 ))}
-                            </datalist>
+                            </select>
                         </Field>
+
                         <Field label="Priority" htmlFor="task-priority">
                             <select
                                 id="task-priority"
