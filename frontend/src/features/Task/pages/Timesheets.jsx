@@ -30,12 +30,17 @@ const SLOT_START = 7; // 07:00 AM
 const SLOT_END = 23; // 11:00 PM
 const SLOT_H = 56; // px per hour
 
+// 🟢 Sửa hàm startOfWeek để tính đúng Thứ Hai theo giờ Local
 function startOfWeek(date) {
     const d = new Date(date);
-    d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // Monday = 0
-    d.setHours(0, 0, 0, 0);
-    return d;
+    const day = d.getDay();
+    // Chuyển Chủ Nhật (0) thành 7 để tính toán chuẩn Thứ Hai = 1
+    const diff = d.getDate() - (day === 0 ? 6 : day - 1);
+    const monday = new Date(d.setDate(diff));
+    monday.setHours(0, 0, 0, 0);
+    return monday;
 }
+
 function addDays(date, n) {
     const d = new Date(date);
     d.setDate(d.getDate() + n);
@@ -48,7 +53,14 @@ function addMonths(date, n) {
     return d;
 }
 function sameDay(a, b) {
-    return toISODate(a) === toISODate(b);
+    if (!a || !b) return false;
+    const d1 = new Date(a);
+    const d2 = new Date(b);
+    return (
+        d1.getFullYear() === d2.getFullYear() &&
+        d1.getMonth() === d2.getMonth() &&
+        d1.getDate() === d2.getDate()
+    );
 }
 function shortDate(d) {
     return `${MONTH_NAMES[d.getMonth()].slice(0, 3)} ${d.getDate()}`;

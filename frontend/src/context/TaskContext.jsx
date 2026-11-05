@@ -61,36 +61,49 @@ export function TaskProvider({ children }) {
     // 2. Thêm Task mới
     const addTask = async (formData) => {
         try {
+            // 🟢 Kiểm tra nếu đã là ISO string hoặc Date chuẩn thì lấy thẳng, tránh ghép trùng
             const dueISO = formData.dueDate
-                ? new Date(formData.dueDate).toISOString()
+                ? typeof formData.dueDate === "string" &&
+                  formData.dueDate.includes("T")
+                    ? formData.dueDate
+                    : new Date(formData.dueDate).toISOString()
                 : new Date().toISOString();
 
-            const startISO =
-                formData.startTime && formData.dueDate
-                    ? new Date(
-                          `${formData.dueDate}T${formData.startTime}:00Z`,
-                      ).toISOString()
-                    : null;
+            const startISO = formData.startTime
+                ? typeof formData.startTime === "string" &&
+                  formData.startTime.includes("T")
+                    ? formData.startTime
+                    : formData.dueDate
+                      ? new Date(
+                            `${formData.dueDate.split("T")[0]}T${formData.startTime}:00`,
+                        ).toISOString()
+                      : null
+                : null;
 
-            const endISO =
-                formData.endTime && formData.dueDate
-                    ? new Date(
-                          `${formData.dueDate}T${formData.endTime}:00Z`,
-                      ).toISOString()
-                    : null;
+            const endISO = formData.endTime
+                ? typeof formData.endTime === "string" &&
+                  formData.endTime.includes("T")
+                    ? formData.endTime
+                    : formData.dueDate
+                      ? new Date(
+                            `${formData.dueDate.split("T")[0]}T${formData.endTime}:00`,
+                        ).toISOString()
+                      : null
+                : null;
 
             const payload = {
                 title: formData.title,
-                description: formData.project
-                    ? `Project: ${formData.project}`
-                    : "",
+                description:
+                    formData.description ||
+                    (formData.project ? `Project: ${formData.project}` : ""),
                 priority: formData.priority || "Medium",
                 status: "Todo",
                 progress: 0,
                 dueDate: dueISO,
                 startTime: startISO,
                 endTime: endISO,
-                workspaceId: currentWorkspace?.id || "personal",
+                workspaceId:
+                    formData.workspaceId || currentWorkspace?.id || "personal",
             };
 
             const createdData = await taskApi.createTask(payload);
@@ -198,21 +211,42 @@ export function parseISODate(iso) {
     return new Date(iso);
 }
 
+export function toISODate(date) {
+    if (!date) return "";
+
+    if (typeof date === "string") {
+        if (date.includes("T")) {
+            const d = new Date(date);
+            if (isNaN(d.getTime())) return date.split("T")[0];
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            return `${y}-${m}-${day}`;
+        }
+        return date.split("T")[0];
+    }
+
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return "";
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+}
+
 export function taskHours(task) {
     if (task?.startTime && task?.endTime) {
         const s = new Date(task.startTime);
         const e = new Date(task.endTime);
-        const start = s.getHours() + s.getMinutes() / 60;
-        const end = e.getHours() + e.getMinutes() / 60;
-        return { start, end };
-    }
-    return { start: 8, end: 10 };
-}
 
-export function toISODate(date) {
-    if (!date) return new Date().toISOString().split("T")[0];
-    const d = new Date(date);
-    return d.toISOString().split("T")[0];
+        if (!isNaN(s.getTime()) && !isNaN(e.getTime())) {
+            const start = s.getHours() + s.getMinutes() / 60;
+            let end = e.getHours() + e.getMinutes() / 60;
+            if (end <= start) end = start + 1;
+            return { start, end };
+        }
+    }
+    return { start: 9, end: 11 };
 }
 
 export function timeToHours(timeStr, options = {}) {
