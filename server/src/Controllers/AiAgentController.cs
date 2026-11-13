@@ -81,12 +81,10 @@ public class AiAgentController : ControllerBase
                 task = createdTask
             });
         }
-
         // 🟢 2. TRƯỜNG HỢP: CẬP NHẬT TASK (UPDATE_TASK)
         if (aiResult.Intent == "UPDATE_TASK")
         {
-            // Đổi tên hàm thành GetUserTasksAsync
-            var userTasks = await _taskService.GetUserTasksAsync(userId);
+            var userTasks = await _taskService.GetTasksByWorkspaceAsync("personal", userId);
 
             var targetTask = userTasks.FirstOrDefault(t =>
                 !string.IsNullOrEmpty(aiResult.TargetTaskTitle) &&
@@ -117,8 +115,7 @@ public class AiAgentController : ControllerBase
         // 🟢 3. TRƯỜNG HỢP: XÓA TASK (DELETE_TASK)
         if (aiResult.Intent == "DELETE_TASK")
         {
-            // Đổi tên hàm thành GetUserTasksAsync
-            var userTasks = await _taskService.GetUserTasksAsync(userId);
+            var userTasks = await _taskService.GetTasksByWorkspaceAsync("personal", userId);
 
             var targetTask = userTasks.FirstOrDefault(t =>
                 !string.IsNullOrEmpty(aiResult.TargetTaskTitle) &&
@@ -185,8 +182,6 @@ public class AiAgentController : ControllerBase
         {
             task.ProofImageUrl = aiResult.ProofImageUrl;
         }
-
-        // 🟢 CHỈ TĂNG/CẬP NHẬT PROGRESS KHI AI CHẤM ĐẠT (aiResult.Ok == true)
         if (aiResult.Ok)
         {
             // Ưu tiên % AI chấm, nếu không có thì lấy % người dùng đề xuất
@@ -209,7 +204,6 @@ public class AiAgentController : ControllerBase
             // Khi AI từ chối: Giữ nguyên task.Progress và task.Status cũ trong DB
             task.AiStatus = "feedback";
         }
-
         // Lưu thay đổi vào MongoDB
         await _taskService.UpdateTaskAsync(taskId, userId, task);
 

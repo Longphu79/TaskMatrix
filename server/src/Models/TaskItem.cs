@@ -24,7 +24,6 @@ public class TaskItem
     [BsonRepresentation(BsonType.ObjectId)]
     public List<string> AssigneeIds { get; set; } = new();
 
-    // Dự án / Phân loại (Ví dụ: "Food Dashboard", "Matrix Domain")
     [BsonElement("project")]
     public string? Project { get; set; }
 

@@ -20,11 +20,13 @@ builder.Services.AddScoped<IMongoDatabase>(sp =>
     return client.GetDatabase(mongoDatabaseName);
 });
 
-// 2. Đăng ký các Business Services & Cấu hình HttpClient nâng cao cho AI / Vision
+
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<TaskService>();
 builder.Services.AddSingleton<AiMemoryService>();
+builder.Services.AddScoped<WorkspaceService>();
+builder.Services.AddScoped<ChatService>();
 
 // Cấu hình nguyên bản của bạn (Không gán BaseAddress)
 builder.Services.AddHttpClient<AiService>(client =>
@@ -110,5 +112,6 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<NotificationHub>("/hubs/notification");
+app.MapHub<ChatHub>("/hubs/chat");
 
 app.Run();

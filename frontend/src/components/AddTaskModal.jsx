@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { toISODate, timeToHours, useTasks } from "../context/TaskContext";
-import { useWorkspace } from "../context/WorkspaceContext"; // 🟢 Import Workspace Context thực tế
+import { useWorkspace } from "../context/WorkspaceContext";
 
 const INPUT_CLS =
     "w-full rounded-xl border border-hairline bg-white px-4 py-2.5 text-sm text-ink outline-none transition placeholder:text-muted focus:border-brand dark:bg-slate-800 dark:border-slate-700/50 dark:text-white";
@@ -20,93 +20,85 @@ function Field({ label, htmlFor, children }) {
 }
 
 export default function AddTaskModal({ onClose, defaultDate, onAdded }) {
-    const { tasks, addTask } = useTasks();
-    const { currentWorkspace, workspaces } = useWorkspace(); // 🟢 Lấy danh sách Workspace thật của User
+    const { addTask } = useTasks();
+    const { currentWorkspace } = useWorkspace();
 
     const [form, setForm] = useState({
         title: "",
-        workspaceId: currentWorkspace?.id || "personal", // 🟢 Lấy Workspace hiện tại làm mặc định
+        project: "", // Nhãn dự án (VD: Matrix Domain, Food Dashboard)
         priority: "Medium",
         dueDate: defaultDate ?? toISODate(new Date()),
         startTime: "09:00",
         endTime: "11:00",
+        description: "",
+        assigneeIds: [],
     });
 
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
-    // 🟢 Quét danh sách Project / Workspace THẬT mà người dùng thuộc về
-    const availableProjects = useMemo(() => {
-        const fromWorkspaces = (workspaces || []).map((w) => w.id || w.name);
-        const fromTasks = (tasks || []).map((t) => t.workspaceId || t.project);
-        const combined = [
-            ...new Set([...fromWorkspaces, ...fromTasks, "personal"]),
-        ].filter(Boolean);
-        return combined.sort();
-    }, [workspaces, tasks]);
+    const isCompanyWorkspace = currentWorkspace?.type === "company";
 
     const set = (key) => (e) => {
         setForm((f) => ({ ...f, [key]: e.target.value }));
         setError("");
     };
 
+    const toggleAssignee = (userId) => {
+        setForm((prev) => {
+            const exists = prev.assigneeIds.includes(userId);
+            return {
+                ...prev,
+                assigneeIds: exists
+                    ? prev.assigneeIds.filter((id) => id !== userId)
+                    : [...prev.assigneeIds, userId],
+            };
+        });
+    };
+
     const submit = async (e) => {
         e.preventDefault();
 
-        // 1. Validate các trường bắt buộc
         if (!form.title.trim()) return setError("Please enter a task title.");
         if (!form.dueDate) return setError("Please choose a due date.");
         if (!form.startTime || !form.endTime)
             return setError("Please set a start and end time.");
 
-        // 2. Chuyển HH:mm sang số giờ để so sánh
         const startH = timeToHours(form.startTime);
         const endH = timeToHours(form.endTime, { isEnd: true });
 
         if (endH <= startH) {
-            setError("End time must be after start time.");
-            return; // 🟢 THÊM RETURN ĐỂ CHẶN KHÔNG CHO TẠO TASK BỊ LỖI
-        }
-
-        // 3. Ràng buộc thời gian quá khứ nếu chọn ngày Hôm Nay
-        const todayStr = toISODate(new Date());
-        if (form.dueDate === todayStr) {
-            const now = new Date();
-            const currentHours = now.getHours() + now.getMinutes() / 60;
-            if (startH < currentHours) {
-                setError("Start time cannot be in the past for today's tasks.");
-                return; // 🟢 THÊM RETURN ĐỂ CHẶN KHÔNG CHO TẠO TASK BỊ LỖI
-            }
+            return setError("End time must be after start time.");
         }
 
         setLoading(true);
         setError("");
 
         try {
-            // 🟢 Hàm ghép ngày + giờ chuẩn địa phương (Local ISO String)
             const createLocalISO = (dateStr, timeStr) => {
                 if (!dateStr || !timeStr) return null;
                 const [year, month, day] = dateStr.split("-").map(Number);
                 const [hours, minutes] = timeStr.split(":").map(Number);
-                // Tạo đối tượng Date theo giờ máy tính local
-                const localDate = new Date(
+                return new Date(
                     year,
                     month - 1,
                     day,
                     hours,
                     minutes,
                     0,
-                );
-                return localDate.toISOString();
+                ).toISOString();
             };
 
             const payload = {
                 title: form.title.trim(),
-                workspaceId: form.workspaceId,
+                workspaceId: currentWorkspace?.id || "personal", // Tự động gắn Workspace hiện tại
+                project: form.project.trim(),
                 priority: form.priority,
+                description: form.description.trim(),
                 dueDate: createLocalISO(form.dueDate, "00:00"),
                 startTime: createLocalISO(form.dueDate, form.startTime),
                 endTime: createLocalISO(form.dueDate, form.endTime),
+                assigneeIds: isCompanyWorkspace ? form.assigneeIds : [],
             };
 
             const createdTask = await addTask(payload);
@@ -114,7 +106,9 @@ export default function AddTaskModal({ onClose, defaultDate, onAdded }) {
             onClose();
         } catch (err) {
             console.error("Failed to add task:", err);
-            setError("Server connection error or invalid request format.");
+            setError(
+                err?.response?.data?.message || "Server connection error.",
+            );
         } finally {
             setLoading(false);
         }
@@ -131,7 +125,7 @@ export default function AddTaskModal({ onClose, defaultDate, onAdded }) {
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="add-task-title"
-                className="max-h-full w-full max-w-md overflow-y-auto rounded-3xl bg-white p-7 shadow-2xl dark:border dark:border-slate-700/50 dark:bg-slate-900"
+                className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-7 shadow-2xl dark:border dark:border-slate-700/50 dark:bg-slate-900"
             >
                 <div className="mb-6 flex items-center justify-between">
                     <h3
@@ -163,6 +157,7 @@ export default function AddTaskModal({ onClose, defaultDate, onAdded }) {
                 </div>
 
                 <div className="space-y-4">
+                    {/* Task Title */}
                     <Field label="Task Title" htmlFor="task-title">
                         <input
                             id="task-title"
@@ -174,24 +169,16 @@ export default function AddTaskModal({ onClose, defaultDate, onAdded }) {
                         />
                     </Field>
 
+                    {/* Project & Priority */}
                     <div className="grid grid-cols-2 gap-4">
-                        {/* 🟢 Select danh sách Workspace / Project THẬT của User */}
-                        <Field
-                            label="Project / Workspace"
-                            htmlFor="task-project"
-                        >
-                            <select
+                        <Field label="Project / Tag" htmlFor="task-project">
+                            <input
                                 id="task-project"
-                                value={form.workspaceId}
-                                onChange={set("workspaceId")}
+                                value={form.project}
+                                onChange={set("project")}
+                                placeholder="e.g. Website Redesign"
                                 className={INPUT_CLS}
-                            >
-                                {availableProjects.map((p) => (
-                                    <option key={p} value={p}>
-                                        {p}
-                                    </option>
-                                ))}
-                            </select>
+                            />
                         </Field>
 
                         <Field label="Priority" htmlFor="task-priority">
@@ -208,6 +195,49 @@ export default function AddTaskModal({ onClose, defaultDate, onAdded }) {
                         </Field>
                     </div>
 
+                    {/* Assign Members (Chỉ hiển thị khi đang ở Workspace Công ty) */}
+                    {isCompanyWorkspace && (
+                        <Field label="Assign Members">
+                            <div className="flex flex-wrap gap-2 rounded-xl border border-hairline bg-canvas/40 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+                                {currentWorkspace.members?.length > 0 ? (
+                                    currentWorkspace.members.map((member) => {
+                                        const isSelected =
+                                            form.assigneeIds.includes(
+                                                member.userId,
+                                            );
+                                        return (
+                                            <button
+                                                key={member.userId}
+                                                type="button"
+                                                onClick={() =>
+                                                    toggleAssignee(
+                                                        member.userId,
+                                                    )
+                                                }
+                                                className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                                    isSelected
+                                                        ? "bg-ink text-white dark:bg-brand dark:text-slate-900"
+                                                        : "bg-white text-ink border border-hairline hover:border-brand dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+                                                }`}
+                                            >
+                                                <span>
+                                                    {member.fullName ||
+                                                        member.email}
+                                                </span>
+                                                {isSelected && <span>✓</span>}
+                                            </button>
+                                        );
+                                    })
+                                ) : (
+                                    <p className="text-xs text-muted">
+                                        No members in this workspace.
+                                    </p>
+                                )}
+                            </div>
+                        </Field>
+                    )}
+
+                    {/* Due Date & Times */}
                     <Field label="Due Date" htmlFor="task-due">
                         <input
                             id="task-due"
@@ -238,6 +268,18 @@ export default function AddTaskModal({ onClose, defaultDate, onAdded }) {
                             />
                         </Field>
                     </div>
+
+                    {/* Task Description */}
+                    <Field label="Task Description" htmlFor="task-desc">
+                        <textarea
+                            id="task-desc"
+                            rows={2}
+                            value={form.description}
+                            onChange={set("description")}
+                            placeholder="Add extra details..."
+                            className="w-full resize-none rounded-xl border border-hairline bg-white px-4 py-2 text-sm text-ink outline-none transition placeholder:text-muted focus:border-brand dark:border-slate-700/50 dark:bg-slate-800 dark:text-white"
+                        />
+                    </Field>
 
                     {error && (
                         <p

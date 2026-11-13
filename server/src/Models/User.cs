@@ -16,10 +16,13 @@ public class User
     public string Email { get; set; } = string.Empty;
 
     [BsonElement("passwordHash")]
-    public string? PasswordHash { get; set; } // Đã sửa thành string? để hỗ trợ Google Login
+    public string? PasswordHash { get; set; } // Hỗ trợ Google Login
 
     [BsonElement("role")]
     public string Role { get; set; } = "User";
+
+    [BsonElement("avatar")]
+    public string? Avatar { get; set; }
 
     [BsonElement("isActive")]
     public bool IsActive { get; set; } = true;

@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useState, useMemo } from "react";
+import {
+    createContext,
+    useContext,
+    useEffect,
+    useState,
+    useMemo,
+    useCallback,
+} from "react";
+import apiClient from "../services/apiClient";
 import {
     GridIcon,
     ChartIcon,
@@ -9,138 +17,120 @@ import {
     FolderIcon,
     ChatIcon,
     RobotIcon,
-    UsersIcon, // Icon dùng cho Quản lý Thành viên
+    UsersIcon,
 } from "../components/icon";
-
-// Danh sách Workspace mặc định đơn giản hóa (Chỉ có Manager & Employee)
-const DEFAULT_WORKSPACES = [
-    {
-        id: "personal",
-        name: "Personal Workspace",
-        type: "personal",
-        role: "Owner",
-        members: [
-            {
-                id: "u-1",
-                name: "Alex Morgan",
-                role: "Owner",
-                avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop",
-            },
-        ],
-    },
-    {
-        id: "matrix-domain",
-        name: "Matrix Domain Co.",
-        type: "company",
-        role: "Manager",
-        members: [
-            {
-                id: "u-1",
-                name: "Alex Morgan",
-                role: "Manager",
-                avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop",
-            },
-            {
-                id: "u-2",
-                name: "Sarah Jenkins",
-                role: "Employee",
-                avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop",
-            },
-            {
-                id: "u-3",
-                name: "David Chen",
-                role: "Employee",
-                avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop",
-            },
-        ],
-    },
-    {
-        id: "fpt-team",
-        name: "FPT Software Team",
-        type: "company",
-        role: "Employee",
-        members: [
-            {
-                id: "u-4",
-                name: "Robert Vance",
-                role: "Manager",
-                avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop",
-            },
-            {
-                id: "u-1",
-                name: "Alex Morgan",
-                role: "Employee",
-                avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop",
-            },
-        ],
-    },
-];
 
 const WorkspaceContext = createContext(null);
 
-function readStorage(key, fallback) {
-    try {
-        const stored = localStorage.getItem(key);
-        return stored ? JSON.parse(stored) : fallback;
-    } catch {
-        return fallback;
-    }
-}
-
 export function WorkspaceProvider({ children }) {
-    const [workspaces, setWorkspaces] = useState(() =>
-        readStorage("tasky-workspaces", DEFAULT_WORKSPACES),
-    );
-    const [currentId, setCurrentId] = useState(() =>
-        readStorage("tasky-current-workspace", "matrix-domain"),
-    );
+    const [workspaces, setWorkspaces] = useState([]);
+    const [currentId, setCurrentId] = useState("personal");
+    const [loading, setLoading] = useState(true);
 
-    const currentWorkspace =
-        workspaces.find((w) => w.id === currentId) || workspaces[0];
+    // 🟢 1. Tải danh sách Workspace từ DB (Tối ưu deps [] để không bị lặp API)
+    const fetchWorkspaces = useCallback(async () => {
+        const token =
+            localStorage.getItem("token") || sessionStorage.getItem("token");
+        if (!token) {
+            setLoading(false);
+            return;
+        }
 
-    const isPersonal = currentWorkspace.type === "personal";
-    const isManager = !isPersonal && currentWorkspace.role === "Manager";
+        try {
+            const data = await apiClient.get("/workspaces");
+            if (Array.isArray(data) && data.length > 0) {
+                setWorkspaces(data);
+
+                // 🟢 Dùng Functional Update (prevId) để không cần thêm currentId vào deps []
+                setCurrentId((prevId) => {
+                    const exists = data.some((w) => w.id === prevId);
+                    return exists ? prevId : data[0].id;
+                });
+            } else {
+                setWorkspaces([
+                    {
+                        id: "personal",
+                        name: "Personal Workspace",
+                        type: "personal",
+                        role: "Owner",
+                        members: [],
+                    },
+                ]);
+            }
+        } catch (err) {
+            console.error("Lỗi khi tải danh sách Workspace từ DB:", err);
+        } finally {
+            setLoading(false);
+        }
+    }, []); // 🟢 Bỏ currentId ra khỏi deps -> Không bao giờ bị lặp re-render API!
 
     useEffect(() => {
-        localStorage.setItem("tasky-workspaces", JSON.stringify(workspaces));
-        localStorage.setItem(
-            "tasky-current-workspace",
-            JSON.stringify(currentWorkspace.id),
+        fetchWorkspaces();
+    }, [fetchWorkspaces]);
+
+    const currentWorkspace = useMemo(() => {
+        return (
+            workspaces.find((w) => w.id === currentId) ||
+            workspaces[0] || {
+                id: "personal",
+                name: "Personal Workspace",
+                type: "personal",
+                role: "Owner",
+                members: [],
+            }
         );
-    }, [workspaces, currentWorkspace.id]);
+    }, [workspaces, currentId]);
+
+    const isPersonal = currentWorkspace.type === "personal";
+    const isManager =
+        !isPersonal &&
+        (currentWorkspace.role === "Manager" ||
+            currentWorkspace.role === "Owner");
 
     const switchWorkspace = (id) => {
-        if (workspaces.some((w) => w.id === id)) {
-            setCurrentId(id);
+        setCurrentId(id);
+    };
+
+    // 🟢 2. Tạo Công ty/Nhóm mới đẩy trực tiếp lên DB MongoDB
+    const addCompany = async (name) => {
+        try {
+            const newCompany = await apiClient.post("/workspaces", { name });
+            await fetchWorkspaces();
+            if (newCompany?.id) setCurrentId(newCompany.id);
+        } catch (err) {
+            console.error("Lỗi khi tạo công ty mới:", err);
+            alert(
+                err?.response?.data?.message || "Không thể tạo Workspace mới.",
+            );
         }
     };
 
-    const addCompany = (name, mode) => {
-        const newCompany = {
-            id: `company-${Date.now()}`,
-            name: name.trim(),
-            type: "company",
-            role: mode === "create" ? "Manager" : "Employee",
-            members: [
-                {
-                    id: "u-1",
-                    name: "Dung",
-                    role: mode === "create" ? "Manager" : "Employee",
-                },
-            ],
-        };
-        setWorkspaces((prev) => [...prev, newCompany]);
-        setCurrentId(newCompany.id);
+    // 🟢 3. Rời khỏi Workspace Công ty
+    const leaveWorkspace = async (workspaceId) => {
+        try {
+            await apiClient.post(`/workspaces/${workspaceId}/leave`);
+
+            if (currentId === workspaceId) {
+                setCurrentId("personal");
+            }
+
+            await fetchWorkspaces();
+        } catch (err) {
+            console.error("Lỗi khi rời Workspace:", err);
+            alert(
+                err?.response?.data?.message || "Không thể rời khỏi Workspace.",
+            );
+        }
     };
 
-    // Bọc useMemo để cố định mảng Navigation, không gây lặp re-render vô tận
+    // 🟢 4. Mảng Navigation cho Sidebar UI
     const navigation = useMemo(() => {
         return isPersonal
             ? [
                   { path: "/dashboard", label: "Dashboard", Icon: GridIcon },
                   { path: "/analytics", label: "Analytics", Icon: ChartIcon },
                   { path: "/timesheets", label: "Timesheets", Icon: ClockIcon },
-                  { path: "/ai-agent", label: "AI Agent", Icon: RobotIcon }, // AI Agent dưới Timesheets
+                  { path: "/ai-agent", label: "AI Agent", Icon: RobotIcon },
                   { path: "/todo", label: "Todo List", Icon: ListIcon },
                   { path: "/report", label: "Reports", Icon: FileIcon },
                   { path: "/settings", label: "Settings", Icon: SettingsIcon },
@@ -157,7 +147,7 @@ export function WorkspaceProvider({ children }) {
                       Icon: FolderIcon,
                   },
                   { path: "/chat", label: "Team Chat", Icon: ChatIcon },
-                  { path: "/ai-agent", label: "AI Agent", Icon: RobotIcon }, // AI Agent dưới Team Chat
+                  { path: "/ai-agent", label: "AI Agent", Icon: RobotIcon },
                   {
                       path: "/timesheets",
                       label: "Team Timesheets",
@@ -194,10 +184,13 @@ export function WorkspaceProvider({ children }) {
                 currentWorkspace,
                 switchWorkspace,
                 addCompany,
+                fetchWorkspaces,
                 isPersonal,
                 isManager,
                 members: currentWorkspace.members || [],
                 navigation,
+                leaveWorkspace,
+                loading,
             }}
         >
             {children}
