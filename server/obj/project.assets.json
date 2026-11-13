@@ -65,6 +65,22 @@
           }
         }
       },
+      "MailKit/5.0.0": {
+        "type": "package",
+        "dependencies": {
+          "MimeKit.Core": "5.0.0"
+        },
+        "compile": {
+          "lib/net10.0/MailKit.dll": {
+            "related": ".dll.config;.pdb;.xml"
+          }
+        },
+        "runtime": {
+          "lib/net10.0/MailKit.dll": {
+            "related": ".dll.config;.pdb;.xml"
+          }
+        }
+      },
       "Microsoft.AspNetCore.Authentication.JwtBearer/10.0.12": {
         "type": "package",
         "dependencies": {
@@ -238,6 +254,19 @@
         "runtime": {
           "lib/net8.0/Microsoft.OpenApi.dll": {
             "related": ".pdb;.xml"
+          }
+        }
+      },
+      "MimeKit.Core/5.0.0": {
+        "type": "package",
+        "compile": {
+          "lib/net10.0/MimeKit.Core.dll": {
+            "related": ".dll.config;.pdb;.xml"
+          }
+        },
+        "runtime": {
+          "lib/net10.0/MimeKit.Core.dll": {
+            "related": ".dll.config;.pdb;.xml"
           }
         }
       },
@@ -533,6 +562,47 @@
         "lib/netstandard2.0/Google.Apis.Core.dll",
         "lib/netstandard2.0/Google.Apis.Core.pdb",
         "lib/netstandard2.0/Google.Apis.Core.xml"
+      ]
+    },
+    "MailKit/5.0.0": {
+      "sha512": "PG6hnsklTzd/iK9A6j03OxDOas9mh8zOBkbPzcsLmFOODE8Hw3HTy7HAKiJvVHXNpKc3/KMVG/4QvOAKCBbGhA==",
+      "type": "package",
+      "path": "mailkit/5.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "docs/ExchangeOAuth2.md",
+        "docs/FAQ.md",
+        "docs/GMailOAuth2.md",
+        "docs/PortingGuide.md",
+        "docs/README.md",
+        "icons/mailkit-50.png",
+        "lib/net10.0/MailKit.dll",
+        "lib/net10.0/MailKit.dll.config",
+        "lib/net10.0/MailKit.pdb",
+        "lib/net10.0/MailKit.xml",
+        "lib/net462/MailKit.dll",
+        "lib/net462/MailKit.pdb",
+        "lib/net462/MailKit.xml",
+        "lib/net47/MailKit.dll",
+        "lib/net47/MailKit.pdb",
+        "lib/net47/MailKit.xml",
+        "lib/net48/MailKit.dll",
+        "lib/net48/MailKit.pdb",
+        "lib/net48/MailKit.xml",
+        "lib/net8.0/MailKit.dll",
+        "lib/net8.0/MailKit.dll.config",
+        "lib/net8.0/MailKit.pdb",
+        "lib/net8.0/MailKit.xml",
+        "lib/netstandard2.0/MailKit.dll",
+        "lib/netstandard2.0/MailKit.pdb",
+        "lib/netstandard2.0/MailKit.xml",
+        "lib/netstandard2.1/MailKit.dll",
+        "lib/netstandard2.1/MailKit.dll.config",
+        "lib/netstandard2.1/MailKit.pdb",
+        "lib/netstandard2.1/MailKit.xml",
+        "mailkit.5.0.0.nupkg.sha512",
+        "mailkit.nuspec"
       ]
     },
     "Microsoft.AspNetCore.Authentication.JwtBearer/10.0.12": {
@@ -1034,6 +1104,44 @@
         "microsoft.openapi.nuspec"
       ]
     },
+    "MimeKit.Core/5.0.0": {
+      "sha512": "0RLaVyex/BjUGqiw9xtGwzyCMaBcsu33Rth61bDCeVeQaaQK7tjcy4TA+nHKTqwUdp4OGd+gnhuq2fuR+c20qA==",
+      "type": "package",
+      "path": "mimekit.core/5.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "docs/FAQ.md",
+        "docs/README.md",
+        "icons/mimekit-50.png",
+        "lib/net10.0/MimeKit.Core.dll",
+        "lib/net10.0/MimeKit.Core.dll.config",
+        "lib/net10.0/MimeKit.Core.pdb",
+        "lib/net10.0/MimeKit.Core.xml",
+        "lib/net462/MimeKit.Core.dll",
+        "lib/net462/MimeKit.Core.pdb",
+        "lib/net462/MimeKit.Core.xml",
+        "lib/net47/MimeKit.Core.dll",
+        "lib/net47/MimeKit.Core.pdb",
+        "lib/net47/MimeKit.Core.xml",
+        "lib/net48/MimeKit.Core.dll",
+        "lib/net48/MimeKit.Core.pdb",
+        "lib/net48/MimeKit.Core.xml",
+        "lib/net8.0/MimeKit.Core.dll",
+        "lib/net8.0/MimeKit.Core.dll.config",
+        "lib/net8.0/MimeKit.Core.pdb",
+        "lib/net8.0/MimeKit.Core.xml",
+        "lib/netstandard2.0/MimeKit.Core.dll",
+        "lib/netstandard2.0/MimeKit.Core.pdb",
+        "lib/netstandard2.0/MimeKit.Core.xml",
+        "lib/netstandard2.1/MimeKit.Core.dll",
+        "lib/netstandard2.1/MimeKit.Core.dll.config",
+        "lib/netstandard2.1/MimeKit.Core.pdb",
+        "lib/netstandard2.1/MimeKit.Core.xml",
+        "mimekit.core.5.0.0.nupkg.sha512",
+        "mimekit.core.nuspec"
+      ]
+    },
     "MongoDB.Bson/3.12.0": {
       "sha512": "2iYGykWDl6Wkx2GHjWaPEGAS49lxQN5YFFT1a7l/pKraMo1gqT4aZckhwu53WMinQTc10R4FxUHoo7X9M20GFg==",
       "type": "package",
@@ -1322,6 +1430,7 @@
   "projectFileDependencyGroups": {
     "net10.0": [
       "Google.Apis.Auth >= 1.77.0",
+      "MailKit >= 5.0.0",
       "Microsoft.AspNetCore.Authentication.JwtBearer >= 10.0.12",
       "Microsoft.AspNetCore.OpenApi >= 10.0.12",
       "MongoDB.Driver >= 3.12.0",
@@ -1329,24 +1438,32 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\ADMIN\\.nuget\\packages\\": {}
+    "C:\\Users\\OS\\.nuget\\packages\\": {},
+    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\ADMIN\\vscode\\NodeJs_Express\\Taskmanager\\server\\server.csproj",
+      "projectUniqueName": "D:\\Đồ Án\\Dự án\\TaskMatrix\\server\\server.csproj",
       "projectName": "server",
-      "projectPath": "C:\\Users\\ADMIN\\vscode\\NodeJs_Express\\Taskmanager\\server\\server.csproj",
-      "packagesPath": "C:\\Users\\ADMIN\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\ADMIN\\vscode\\NodeJs_Express\\Taskmanager\\server\\obj\\",
+      "projectPath": "D:\\Đồ Án\\Dự án\\TaskMatrix\\server\\server.csproj",
+      "packagesPath": "C:\\Users\\OS\\.nuget\\packages\\",
+      "outputPath": "D:\\Đồ Án\\Dự án\\TaskMatrix\\server\\obj\\",
       "projectStyle": "PackageReference",
+      "fallbackFolders": [
+        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+      ],
       "configFilePaths": [
-        "C:\\Users\\ADMIN\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "C:\\Users\\OS\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
         "net10.0"
       ],
       "sources": {
+        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+        "C:\\Program Files\\dotnet\\library-packs": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
@@ -1376,6 +1493,10 @@
           "Google.Apis.Auth": {
             "target": "Package",
             "version": "[1.77.0, )"
+          },
+          "MailKit": {
+            "target": "Package",
+            "version": "[5.0.0, )"
           },
           "Microsoft.AspNetCore.Authentication.JwtBearer": {
             "target": "Package",
@@ -1413,7 +1534,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.401/PortableRuntimeIdentifierGraph.json",
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.403/PortableRuntimeIdentifierGraph.json",
         "packagesToPrune": {
           "Microsoft.AspNetCore": "(,10.0.32767]",
           "Microsoft.AspNetCore.Antiforgery": "(,10.0.32767]",

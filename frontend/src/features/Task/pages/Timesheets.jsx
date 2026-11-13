@@ -576,7 +576,7 @@ function DayDetailModal({ date, tasks, onToggle, onDelete, onAdd, onClose }) {
 
 export default function TimesheetsPage() {
     const { isPersonal, currentWorkspace } = useWorkspace(); // Lấy workspace hiện tại
-    const { tasks = [], toggleTask, deleteTask } = useTasks();
+    const { tasks = [], toggleTask, deleteTask, storageMode } = useTasks();
     const [view, setView] = useState("week");
     const [anchor, setAnchor] = useState(() => new Date());
     const [selectedDay, setSelectedDay] = useState(null);
@@ -644,6 +644,14 @@ export default function TimesheetsPage() {
                             ? "Personal Schedule"
                             : `${currentWorkspace?.name || "Project"} Schedule`}
                     </p>
+                    {storageMode === "offline" && (
+                        <p
+                            role="status"
+                            className="mt-2 inline-flex rounded-lg bg-brand-soft px-3 py-1 text-xs font-semibold text-ink dark:bg-brand/15 dark:text-brand"
+                        >
+                            Offline mode — tasks are saved in this browser only.
+                        </p>
+                    )}
                 </div>
                 <button
                     onClick={() => setAddDate(toISODate(new Date()))}

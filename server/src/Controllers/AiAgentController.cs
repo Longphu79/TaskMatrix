@@ -157,7 +157,10 @@ public class AiAgentController : ControllerBase
         if (proofImage == null || proofImage.Length == 0)
             return BadRequest("Vui lòng tải lên hình ảnh minh chứng.");
 
-        var task = await _taskService.GetTaskByIdAsync(taskId);
+        if (string.IsNullOrWhiteSpace(userId))
+            return Unauthorized();
+
+        var task = await _taskService.GetTaskByIdAsync(taskId, userId);
         if (task == null) return NotFound("Không tìm thấy công việc cần xác minh.");
 
         var result = await _visionService.VerifyTaskProofAsync(task.Title, task.Description ?? "", proofImage);

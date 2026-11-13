@@ -9,6 +9,7 @@
       "server/1.0.0": {
         "dependencies": {
           "Google.Apis.Auth": "1.77.0",
+          "MailKit": "5.0.0",
           "Microsoft.AspNetCore.Authentication.JwtBearer": "10.0.12",
           "Microsoft.AspNetCore.OpenApi": "10.0.12",
           "MongoDB.Driver": "3.12.0",
@@ -58,6 +59,17 @@
           "lib/net6.0/Google.Apis.Core.dll": {
             "assemblyVersion": "1.77.0.0",
             "fileVersion": "1.77.0.0"
+          }
+        }
+      },
+      "MailKit/5.0.0": {
+        "dependencies": {
+          "MimeKit.Core": "5.0.0"
+        },
+        "runtime": {
+          "lib/net10.0/MailKit.dll": {
+            "assemblyVersion": "5.0.0.0",
+            "fileVersion": "5.0.0.0"
           }
         }
       },
@@ -161,6 +173,14 @@
           "lib/net8.0/Microsoft.OpenApi.dll": {
             "assemblyVersion": "2.12.0.0",
             "fileVersion": "2.12.0.0"
+          }
+        }
+      },
+      "MimeKit.Core/5.0.0": {
+        "runtime": {
+          "lib/net10.0/MimeKit.Core.dll": {
+            "assemblyVersion": "5.0.0.0",
+            "fileVersion": "5.0.0.0"
           }
         }
       },
@@ -331,6 +351,13 @@
       "path": "google.apis.core/1.77.0",
       "hashPath": "google.apis.core.1.77.0.nupkg.sha512"
     },
+    "MailKit/5.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-PG6hnsklTzd/iK9A6j03OxDOas9mh8zOBkbPzcsLmFOODE8Hw3HTy7HAKiJvVHXNpKc3/KMVG/4QvOAKCBbGhA==",
+      "path": "mailkit/5.0.0",
+      "hashPath": "mailkit.5.0.0.nupkg.sha512"
+    },
     "Microsoft.AspNetCore.Authentication.JwtBearer/10.0.12": {
       "type": "package",
       "serviceable": true,
@@ -400,6 +427,13 @@
       "sha512": "sha512-0xB/be+f6qYOhvQPUrVsLrau+fkowYv6gt9RIkajMhwT7sZnqtcA797yW3bS5kgSje+AQW4xZgyLnW641YFioQ==",
       "path": "microsoft.openapi/2.12.0",
       "hashPath": "microsoft.openapi.2.12.0.nupkg.sha512"
+    },
+    "MimeKit.Core/5.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-0RLaVyex/BjUGqiw9xtGwzyCMaBcsu33Rth61bDCeVeQaaQK7tjcy4TA+nHKTqwUdp4OGd+gnhuq2fuR+c20qA==",
+      "path": "mimekit.core/5.0.0",
+      "hashPath": "mimekit.core.5.0.0.nupkg.sha512"
     },
     "MongoDB.Bson/3.12.0": {
       "type": "package",

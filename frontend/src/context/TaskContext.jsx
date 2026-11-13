@@ -7,6 +7,7 @@ import {
 } from "react";
 import apiClient from "../services/apiClient";
 import { useWorkspace } from "./WorkspaceContext";
+import { useAuth } from "./AuthContext";
 
 const TaskContext = createContext(null);
 
@@ -21,19 +22,61 @@ function normalizeTask(t) {
         ).toLowerCase(),
         title: t.title || t.Title || "",
         description: t.description || t.Description || "",
+        project: t.project || t.Project,
         priority: t.priority || t.Priority || "Medium",
         status: t.status || t.Status || "Todo",
         dueDate: t.dueDate || t.DueDate,
         startTime: t.startTime || t.StartTime,
         endTime: t.endTime || t.EndTime,
         createdAt: t.createdAt || t.CreatedAt,
+        updatedAt: t.updatedAt || t.UpdatedAt,
+        completedAt: t.completedAt || t.CompletedAt,
+        actualMinutes: t.actualMinutes ?? t.ActualMinutes ?? 0,
+        isLocalOnly: Boolean(t.isLocalOnly || t.IsLocalOnly),
     };
+}
+
+function readStoredTasks(key) {
+    try {
+        const stored = localStorage.getItem(key);
+        const parsed = stored ? JSON.parse(stored) : [];
+        return Array.isArray(parsed)
+            ? parsed.map(normalizeTask).filter(Boolean)
+            : [];
+    } catch (error) {
+        console.error("Could not read locally saved tasks:", error);
+        return [];
+    }
+}
+
+function backendUnavailable(error) {
+    // 401 là lỗi xác thực, không phải mất kết nối
+    if (error?.response) {
+        return error.response.status >= 500;
+    }
+
+    // Chỉ coi là offline khi không thể kết nối Backend
+    return Boolean(
+        error?.request ||
+        error?.code === "ERR_NETWORK"
+    );
 }
 
 export function TaskProvider({ children }) {
     const { currentWorkspace } = useWorkspace();
+    const { user } = useAuth();
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [storageMode, setStorageMode] = useState("online");
+
+    const storageKey = `taskmatrix:tasks:${user?.id || user?.email || "guest"}:${currentWorkspace?.id || "personal"}`;
+
+    const saveTasksLocally = useCallback(
+        (nextTasks) => {
+            localStorage.setItem(storageKey, JSON.stringify(nextTasks));
+        },
+        [storageKey],
+    );
 
     // 1. Lấy danh sách Tasks từ DB
     const fetchTasks = useCallback(async () => {
@@ -43,16 +86,32 @@ export function TaskProvider({ children }) {
             const res = await apiClient.get("/tasks");
             const rawList = Array.isArray(res) ? res : [];
 
-            const cleanTasks = rawList.map(normalizeTask).filter(Boolean);
-            console.log("Tasks từ DB sau khi chuẩn hóa:", cleanTasks);
+            const serverTasks = rawList.map(normalizeTask).filter(Boolean);
+            const localOnlyTasks = readStoredTasks(storageKey).filter(
+                (task) => task.isLocalOnly,
+            );
+            const serverTaskIds = new Set(serverTasks.map((task) => task.id));
+            const cleanTasks = [
+                ...serverTasks,
+                ...localOnlyTasks.filter((task) => !serverTaskIds.has(task.id)),
+            ];
+            saveTasksLocally(cleanTasks);
             setTasks(cleanTasks);
+            setStorageMode("online");
         } catch (err) {
             console.error("Lỗi khi tải danh sách Tasks từ DB:", err);
-            setTasks([]);
-        } finally {
+
+            setTasks(readStoredTasks(storageKey));
+
+            if (backendUnavailable(err)) {
+                setStorageMode("offline");
+            } else {
+                setStorageMode("online");
+            }
+        }finally {
             setLoading(false);
         }
-    }, []);
+    }, [saveTasksLocally, storageKey]);
 
     useEffect(() => {
         fetchTasks();
@@ -61,23 +120,38 @@ export function TaskProvider({ children }) {
     // 2. Thêm Task mới
     const addTask = async (formData) => {
         try {
-            const dueISO = formData.dueDate
-                ? new Date(formData.dueDate).toISOString()
-                : new Date().toISOString();
+            // const dueISO = formData.dueDate
+            //     ? new Date(formData.dueDate).toISOString()
+            //     : new Date().toISOString();
 
-            const startISO =
-                formData.startTime && formData.dueDate
-                    ? new Date(
-                          `${formData.dueDate}T${formData.startTime}:00Z`,
-                      ).toISOString()
+            // const startISO =
+            //     formData.startTime && formData.dueDate
+            //         ? new Date(
+            //               `${formData.dueDate}T${formData.startTime}:00`,
+            //           ).toISOString()
+            //         : null;
+
+            // const endISO =
+            //     formData.endTime && formData.dueDate
+            //         ? new Date(
+            //               `${formData.dueDate}T${formData.endTime}:00`,
+            //           ).toISOString()
+            //         : null;
+
+            // Giữ nguyên ngày theo giờ địa phương, tránh lệch ngày UTC
+                const dueISO = formData.dueDate
+                    ? `${formData.dueDate}T00:00:00`
                     : null;
 
-            const endISO =
-                formData.endTime && formData.dueDate
-                    ? new Date(
-                          `${formData.dueDate}T${formData.endTime}:00Z`,
-                      ).toISOString()
-                    : null;
+                const startISO =
+                    formData.startTime && formData.dueDate
+                        ? `${formData.dueDate}T${formData.startTime}:00`
+                        : null;
+
+                const endISO =
+                    formData.endTime && formData.dueDate
+                        ? `${formData.dueDate}T${formData.endTime}:00`
+                        : null;
 
             const payload = {
                 title: formData.title,
@@ -92,12 +166,32 @@ export function TaskProvider({ children }) {
                 workspaceId: currentWorkspace?.id || "personal",
             };
 
-            // res ở đây chính là object Task vừa tạo
-            const createdData = await apiClient.post("/tasks", payload);
-
-            if (createdData) {
+            try {
+                const createdData = await apiClient.post("/tasks", payload);
                 const newTask = normalizeTask(createdData);
-                setTasks((prev) => [newTask, ...prev.filter(Boolean)]);
+                if (!newTask?.id) {
+                    throw new Error("The server did not return the created task.");
+                }
+
+                const nextTasks = [newTask, ...tasks.filter(Boolean)];
+                saveTasksLocally(nextTasks);
+                setTasks(nextTasks);
+                setStorageMode("online");
+                return newTask;
+            } catch (err) {
+                if (!backendUnavailable(err)) throw err;
+
+                const newTask = normalizeTask({
+                    ...payload,
+                    id: `local-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                    project: formData.project?.trim() || "",
+                    isLocalOnly: true,
+                    createdAt: new Date().toISOString(),
+                });
+                const nextTasks = [newTask, ...tasks.filter(Boolean)];
+                saveTasksLocally(nextTasks);
+                setTasks(nextTasks);
+                setStorageMode("offline");
                 return newTask;
             }
         } catch (err) {
@@ -112,32 +206,53 @@ export function TaskProvider({ children }) {
         if (!target) return;
 
         const newStatus = target.status === "Completed" ? "Todo" : "Completed";
+        const updatedAt = new Date().toISOString();
+        const completedAt =
+            newStatus === "Completed" ? updatedAt : null;
 
-        setTasks((prev) =>
-            prev.map((t) =>
-                t?.id === taskId ? { ...t, status: newStatus } : t,
-            ),
+        const nextTasks = tasks.map((task) =>
+            task?.id === taskId
+                ? { ...task, status: newStatus, completedAt, updatedAt }
+                : task,
         );
+        saveTasksLocally(nextTasks);
+        setTasks(nextTasks);
+
+        if (String(taskId).startsWith("local-")) return;
 
         try {
             await apiClient.put(`/tasks/${taskId}`, {
                 ...target,
                 status: newStatus,
+                completedAt,
             });
         } catch (err) {
             console.error("Lỗi cập nhật Task:", err);
-            fetchTasks();
+            if (backendUnavailable(err)) {
+                setStorageMode("offline");
+            } else {
+                fetchTasks();
+            }
         }
     };
 
     // 4. Xóa Task
     const deleteTask = async (taskId) => {
-        setTasks((prev) => prev.filter((t) => t?.id !== taskId));
+        const nextTasks = tasks.filter((task) => task?.id !== taskId);
+        saveTasksLocally(nextTasks);
+        setTasks(nextTasks);
+
+        if (String(taskId).startsWith("local-")) return;
+
         try {
             await apiClient.delete(`/tasks/${taskId}`);
         } catch (err) {
             console.error("Lỗi xóa Task:", err);
-            fetchTasks();
+            if (backendUnavailable(err)) {
+                setStorageMode("offline");
+            } else {
+                fetchTasks();
+            }
         }
     };
 
@@ -146,6 +261,7 @@ export function TaskProvider({ children }) {
             value={{
                 tasks,
                 loading,
+                storageMode,
                 fetchTasks,
                 addTask,
                 toggleTask,
@@ -181,11 +297,31 @@ export function taskHours(task) {
     return { start: 8, end: 10 };
 }
 
+// export function toISODate(date) {
+//     if (!date) return new Date().toISOString().split("T")[0];
+//     const d = new Date(date);
+//     return d.toISOString().split("T")[0];
+// }
+
 export function toISODate(date) {
-    if (!date) return new Date().toISOString().split("T")[0];
+    if (!date) {
+        const now = new Date();
+        return [
+            now.getFullYear(),
+            String(now.getMonth() + 1).padStart(2, "0"),
+            String(now.getDate()).padStart(2, "0"),
+        ].join("-");
+    }
+
     const d = new Date(date);
-    return d.toISOString().split("T")[0];
+
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
 }
+
 
 export function timeToHours(timeStr, options = {}) {
     if (!timeStr) return 0;
