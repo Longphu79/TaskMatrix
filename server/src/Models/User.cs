@@ -39,4 +39,10 @@ public class User
 
     [BsonElement("googleSubject")]
     public string? GoogleSubject { get; set; }
+    
+    [BsonElement("resetTokenHash")]
+    public string? ResetTokenHash { get; set; }
+
+    [BsonElement("resetTokenExpiry")]
+    public DateTime? ResetTokenExpiry { get; set; }
 }

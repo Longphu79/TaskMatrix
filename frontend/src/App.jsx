@@ -23,6 +23,8 @@ import AiAgentChat from "./pages/AiAgentChat"; // Hoặc đường dẫn file Ai
 import LoginPage from "./features/auth/pages/Login";
 import SignUpPage from "./features/auth/pages/SignUpPage";
 import LandingPage from "./features/auth/pages/LandingPage";
+import ForgotPasswordPage from "./features/auth/pages/ForgotPassword";
+import ResetPasswordPage from "./features/auth/pages/ResetPassword";
 
 // Lazy load Admin Portal
 const AdminPage = lazy(() => import("./features/admin/pages/Admin"));
@@ -127,6 +129,16 @@ export default function App() {
 
                 {/* ADMIN PORTAL ROUTE */}
                 <Route path="/admin/*" element={<AdminEntry />} />
+
+                <Route
+                    path="/forgot-password"
+                    element={<ForgotPasswordPage />}
+                />
+
+                <Route
+                    path="/reset-password"
+                    element={<ResetPasswordPage />}
+                />
 
                 {/* PROTECTED ROUTES (Được bọc bởi MainLayout) */}
                 <Route element={<ProtectedRoute />}>

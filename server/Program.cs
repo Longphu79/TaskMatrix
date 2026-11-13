@@ -5,6 +5,7 @@ using MongoDB.Driver;
 using TaskMatrix.Api.Hubs;
 using TaskMatrix.Api.Services;
 using TaskMatrix.Api.Workers;
+using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +25,8 @@ builder.Services.AddScoped<IMongoDatabase>(sp =>
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<TaskService>();
+builder.Services.AddScoped<AnalyticsService>();
+builder.Services.AddScoped<EmailService>();
 builder.Services.AddSingleton<AiMemoryService>();
 
 // Cấu hình nguyên bản của bạn (Không gán BaseAddress)
@@ -47,20 +50,49 @@ builder.Services.AddHttpClient<VisionService>(client =>
     ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => true
 });
 
-// 3. Cấu hình Xác thực JWT
-var jwtKey = builder.Configuration["Jwt:Key"] ?? "SuperSecretKeyForTaskMatrixApp2026";
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+// Đọc cấu hình JWT
+var jwtKey = builder.Configuration["Jwt:Key"];
+var jwtIssuer = builder.Configuration["Jwt:Issuer"];
+var jwtAudience = builder.Configuration["Jwt:Audience"];
+
+if (string.IsNullOrWhiteSpace(jwtKey) ||
+    Encoding.UTF8.GetByteCount(jwtKey) < 32)
+{
+    throw new InvalidOperationException(
+        "JWT Key must contain at least 32 bytes."
+    );
+}
+
+if (string.IsNullOrWhiteSpace(jwtIssuer) ||
+    string.IsNullOrWhiteSpace(jwtAudience))
+{
+    throw new InvalidOperationException(
+        "JWT Issuer and Audience must be configured."
+    );
+}
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
+            ValidIssuer = jwtIssuer,
+
             ValidateAudience = true,
+            ValidAudience = jwtAudience,
+
             ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30),
+
             ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtKey)
+            ),
+
+            NameClaimType = ClaimTypes.NameIdentifier,
+            RoleClaimType = ClaimTypes.Role
         };
 
         options.Events = new JwtBearerEvents
@@ -69,10 +101,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             {
                 var accessToken = context.Request.Query["access_token"];
                 var path = context.HttpContext.Request.Path;
-                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+
+                if (!string.IsNullOrEmpty(accessToken) &&
+                    path.StartsWithSegments("/hubs"))
                 {
                     context.Token = accessToken;
                 }
+
                 return Task.CompletedTask;
             }
         };

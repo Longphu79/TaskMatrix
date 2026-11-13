@@ -9,4 +9,8 @@ export const authApi = {
 
     // Đăng nhập Google
     googleLogin: (idToken) => apiClient.post("/Auth/google-login", { idToken }),
+
+    forgotPassword: (email) => apiClient.post("/Auth/forgot-password", { email }),
+
+    resetPassword: (data) => apiClient.post("/Auth/reset-password", data),
 };

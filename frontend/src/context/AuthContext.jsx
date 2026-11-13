@@ -14,18 +14,23 @@ function getStoredUser() {
 }
 
 export function AuthProvider({ children }) {
-    const [user, setUser] = useState(getStoredUser);
+        const [user, setUser] = useState(getInitialSession);
+        const [loading, setLoading] = useState(false);
 
-    // Lưu / Xóa dữ liệu User và JWT Token
-    const persist = (userData, token) => {
-        setUser(userData);
-        if (userData && token) {
-            // Lưu token chuẩn để apiClient.js tự động lấy đính kèm vào Header
+        const persist = (userData, token) => {
+        if (userData && token && !isTokenExpired(token)) {
             localStorage.setItem("token", token);
-            localStorage.setItem("tasky-user", JSON.stringify(userData));
+            localStorage.setItem(
+                "tasky-user",
+                JSON.stringify(userData)
+            );
+
+            setUser(userData);
         } else {
             localStorage.removeItem("token");
             localStorage.removeItem("tasky-user");
+
+            setUser(null);
         }
     };
 
@@ -68,37 +73,30 @@ export function AuthProvider({ children }) {
         return userData;
     };
 
-    const googleLogin = async (idToken) => {
-        try {
-            // Nếu truyền idToken thực tế -> Gọi API Backend .NET
-            if (idToken && typeof idToken === "string") {
-                const res = await authApi.googleLogin(idToken);
-                const userData = {
-                    id: res.userId,
-                    name: res.fullName,
-                    email: res.email,
-                    role: res.role,
-                };
-                persist(userData, res.token);
-                return userData;
+    
+        const googleLogin = async (idToken) => {
+            if (!idToken) {
+                throw new Error("Google ID Token is missing.");
             }
-        } catch (error) {
-            console.warn(
-                "Backend API không phản hồi, chuyển sang chế độ Google Demo:",
-                error,
-            );
-        }
 
-        // FALLBACK DEMO: Nếu không truyền token hoặc API lỗi, tạo sẵn User Google giả lập
-        const mockGoogleUser = {
-            id: "google-user-123",
-            name: "Alex Morgan",
-            email: "alex.morgan@gmail.com",
-            role: "User",
+            const res = await authApi.googleLogin(idToken);
+
+            if (!res?.token || !res?.userId) {
+                throw new Error("Invalid authentication response.");
+            }
+
+            const userData = {
+                id: res.userId,
+                name: res.fullName,
+                email: res.email,
+                role: res.role,
+            };
+
+            persist(userData, res.token);
+
+            return userData;
         };
-        persist(mockGoogleUser, "mock-google-jwt-token-xyz");
-        return mockGoogleUser;
-    };
+
 
     // 4. Đăng xuất (Xóa sạch token và dữ liệu user)
     const logout = () => persist(null, null);
@@ -107,6 +105,7 @@ export function AuthProvider({ children }) {
         <AuthContext.Provider
             value={{
                 user,
+                loading,
                 isAuthenticated: !!user,
                 login,
                 signup,
@@ -126,3 +125,56 @@ export function useAuth() {
     }
     return ctx;
 }
+
+
+function isTokenExpired(token) {
+    if (!token) return true;
+
+    try {
+        const payload = token.split(".")[1];
+
+        if (!payload) return true;
+
+        const base64 = payload
+            .replace(/-/g, "+")
+            .replace(/_/g, "/");
+
+        const decoded = JSON.parse(
+            atob(base64.padEnd(
+                base64.length + (4 - base64.length % 4) % 4,
+                "="
+            ))
+        );
+
+        if (!decoded.exp) return true;
+
+        // Cho phép sai lệch đồng hồ 30 giây
+        return Date.now() >= decoded.exp * 1000 - 30000;
+    } catch {
+        return true;
+    }
+}
+
+function getInitialSession() {
+    if (typeof window === "undefined") {
+        return null;
+    }
+
+    try {
+        const token = localStorage.getItem("token");
+        const rawUser = localStorage.getItem("tasky-user");
+
+        if (!token || !rawUser || isTokenExpired(token)) {
+            localStorage.removeItem("token");
+            localStorage.removeItem("tasky-user");
+            return null;
+        }
+
+        return JSON.parse(rawUser);
+    } catch {
+        localStorage.removeItem("token");
+        localStorage.removeItem("tasky-user");
+        return null;
+    }
+}
+
