@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using TaskMatrix.Api.DTOs;
 using TaskMatrix.Api.Models;
 using TaskMatrix.Api.Services;
 
@@ -13,23 +12,21 @@ namespace TaskMatrix.Api.Controllers;
 public class TasksController : ControllerBase
 {
     private readonly TaskService _taskService;
-    private readonly VisionService _visionService; // 🟢 Thêm VisionService nếu gom endpoint chấm AI về đây
 
-    public TasksController(TaskService taskService, VisionService visionService)
+    public TasksController(TaskService taskService)
     {
         _taskService = taskService;
-        _visionService = visionService;
     }
 
-    // Lấy UserId an toàn từ Token JWT
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-    // 1. Lấy tất cả Task của User
+    // 1. Lấy tất cả Task theo Workspace (Mặc định là "personal")
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] string workspaceId = "personal")
     {
         if (string.IsNullOrEmpty(CurrentUserId)) return Unauthorized();
-        var tasks = await _taskService.GetUserTasksAsync(CurrentUserId);
+
+        var tasks = await _taskService.GetTasksByWorkspaceAsync(workspaceId, CurrentUserId);
         return Ok(tasks);
     }
 
@@ -47,6 +44,7 @@ public class TasksController : ControllerBase
     public async Task<IActionResult> Create([FromBody] TaskItem task)
     {
         if (string.IsNullOrEmpty(CurrentUserId)) return Unauthorized();
+
         var createdTask = await _taskService.CreateTaskAsync(CurrentUserId, task);
         return CreatedAtAction(nameof(GetById), new { id = createdTask.Id }, createdTask);
     }
@@ -62,7 +60,7 @@ public class TasksController : ControllerBase
             return NotFound(new { message = "Task not found or you don't have permission to update it" });
 
         var updatedTask = await _taskService.GetTaskByIdAsync(id);
-        return Ok(updatedTask); // Trả về object đã update để Frontend sync State
+        return Ok(updatedTask);
     }
 
     // 5. Xóa Task

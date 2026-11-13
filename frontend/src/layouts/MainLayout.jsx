@@ -19,7 +19,7 @@ function Sidebar({ open, onClose }) {
                 />
             )}
             <aside
-                className={`fixed z-40 flex h-full w-64 shrink-0 flex-col overflow-hidden border-r border-hairline bg-white px-5 py-7 transition-transform dark:border-slate-800 dark:bg-slate-900 lg:static lg:translate-x-0 ${
+                className={`fixed z-40 flex h-full w-64 shrink-0 flex-col border-r border-hairline bg-white px-5 py-7 transition-transform dark:border-slate-800 dark:bg-slate-900 lg:static lg:translate-x-0 ${
                     open ? "translate-x-0" : "-translate-x-full"
                 }`}
             >

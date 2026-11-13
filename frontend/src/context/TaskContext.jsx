@@ -5,7 +5,7 @@ import {
     useEffect,
     useCallback,
 } from "react";
-import { taskApi } from "../features/Task/api/taskApi"; // Chỉnh lại đường dẫn import tương ứng với thư mục của bạn
+import { taskApi } from "../features/Task/api/taskApi";
 import { useWorkspace } from "./WorkspaceContext";
 
 const TaskContext = createContext(null);
@@ -18,15 +18,22 @@ function normalizeTask(t) {
         workspaceId: String(
             t.workspaceId || t.WorkspaceId || "personal",
         ).toLowerCase(),
+        // 🟢 Bổ sung các trường phân công & dự án
+        assigneeIds: t.assigneeIds || t.AssigneeIds || [],
+        project: t.project || t.Project || "",
         title: t.title || t.Title || "",
         description: t.description || t.Description || "",
         priority: t.priority || t.Priority || "Medium",
-        status: t.status || t.Status || "Todo",
+        status: t.status || t.Status || "Pending",
         progress: t.progress ?? t.Progress ?? 0,
+        // AI Verification fields
         aiVerificationReason:
             t.aiVerificationReason || t.AiVerificationReason || "",
         proofImageUrl: t.proofImageUrl || t.ProofImageUrl || "",
         aiStatus: t.aiStatus || t.AiStatus || null,
+        aiNotes: t.aiNotes || t.AiNotes || "",
+        aiFeedback: t.aiFeedback || t.AiFeedback || "",
+        // Time fields
         dueDate: t.dueDate || t.DueDate,
         startTime: t.startTime || t.StartTime,
         endTime: t.endTime || t.EndTime,
@@ -39,11 +46,21 @@ export function TaskProvider({ children }) {
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // 1. Lấy danh sách Tasks
+    // 1. Lấy danh sách Tasks theo Workspace (Fix lỗi 401 & Lọc Workspace)
     const fetchTasks = useCallback(async () => {
+        // Kiểm tra Token trước khi gọi API để tránh lỗi 401 khi chưa đăng nhập
+        const token =
+            localStorage.getItem("token") || sessionStorage.getItem("token");
+        if (!token) {
+            setTasks([]);
+            setLoading(false);
+            return;
+        }
+
         setLoading(true);
         try {
-            const res = await taskApi.getTasks();
+            const wsId = currentWorkspace?.id || "personal";
+            const res = await taskApi.getTasks(wsId);
             const rawList = Array.isArray(res) ? res : [];
             setTasks(rawList.map(normalizeTask).filter(Boolean));
         } catch (err) {
@@ -52,16 +69,15 @@ export function TaskProvider({ children }) {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [currentWorkspace?.id]);
 
     useEffect(() => {
         fetchTasks();
-    }, [fetchTasks, currentWorkspace?.id]);
+    }, [fetchTasks]);
 
-    // 2. Thêm Task mới
+    // 2. Thêm Task mới (Hỗ trợ Personal & Company Task Assignment)
     const addTask = async (formData) => {
         try {
-            // 🟢 Kiểm tra nếu đã là ISO string hoặc Date chuẩn thì lấy thẳng, tránh ghép trùng
             const dueISO = formData.dueDate
                 ? typeof formData.dueDate === "string" &&
                   formData.dueDate.includes("T")
@@ -93,17 +109,20 @@ export function TaskProvider({ children }) {
 
             const payload = {
                 title: formData.title,
-                description:
-                    formData.description ||
-                    (formData.project ? `Project: ${formData.project}` : ""),
+                description: formData.description || "",
+                project: formData.project || "",
                 priority: formData.priority || "Medium",
-                status: "Todo",
+                status: "Pending",
                 progress: 0,
                 dueDate: dueISO,
                 startTime: startISO,
                 endTime: endISO,
                 workspaceId:
                     formData.workspaceId || currentWorkspace?.id || "personal",
+                // 🟢 Mảng ID người nhận việc (Manager chọn nhiều member hoặc để trống cho chính mình)
+                assigneeIds: Array.isArray(formData.assigneeIds)
+                    ? formData.assigneeIds
+                    : [],
             };
 
             const createdData = await taskApi.createTask(payload);
@@ -121,9 +140,11 @@ export function TaskProvider({ children }) {
     // 3. Cập nhật Task
     const updateTask = async (taskId, patch) => {
         try {
-            const res = await taskApi.updateTask(taskId, patch);
+            const target = tasks.find((t) => t?.id === taskId);
+            const fullPayload = { ...target, ...patch };
+            const res = await taskApi.updateTask(taskId, fullPayload);
             const updatedTask =
-                normalizeTask(res) || normalizeTask({ ...patch, id: taskId });
+                normalizeTask(res) || normalizeTask(fullPayload);
 
             setTasks((prev) =>
                 prev.map((t) =>
@@ -144,12 +165,9 @@ export function TaskProvider({ children }) {
         if (!target) return;
 
         const isNowCompleted = target.status !== "Completed";
-        const newStatus = isNowCompleted ? "Completed" : "Todo";
-
-        // 🟢 Khi tick thành công -> 100%. Khi bỏ tick -> Reset về 0%
+        const newStatus = isNowCompleted ? "Completed" : "Pending";
         const newProgress = isNowCompleted ? 100 : 0;
 
-        // Optimistic UI update
         setTasks((prev) =>
             prev.map((t) =>
                 t?.id === taskId
