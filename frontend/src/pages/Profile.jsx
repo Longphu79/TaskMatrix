@@ -40,7 +40,7 @@ function ProfileIcon({ children, className = "" }) {
 
 function ProfileTabs({ active, onChange }) {
     return (
-        <div className="flex gap-7 overflow-x-auto border-b border-hairline px-5 sm:px-8">
+        <div className="flex gap-7 overflow-x-auto scrollbar-hidden border-b border-hairline px-5 sm:px-8">
             {TABS.map((tab) => (
                 <button
                     key={tab}

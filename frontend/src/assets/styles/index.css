@@ -45,6 +45,14 @@ html, body, #root {
   height: 100%;
 }
 
+.scrollbar-hidden {
+  scrollbar-width: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
 body {
   font-family: var(--font-sans);
   color: var(--color-ink);
