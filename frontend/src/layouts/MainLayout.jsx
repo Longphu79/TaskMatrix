@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { Columns3 } from "lucide-react";
 import {
     GridIcon,
     ChartIcon,
@@ -28,6 +29,7 @@ const NAV = [
         Icon: ClockIcon,
     },
     { key: "todo", label: "Todo", path: "/todo", Icon: ListIcon },
+    { key: "board", label: "Board", path: "/board", Icon: Columns3 },
     {
         key: "documents",
         label: "Documents",
@@ -112,6 +114,8 @@ function Topbar({ onMenu }) {
     const currentNav = NAV.find((n) => n.path === location.pathname);
     const title = location.pathname === "/profile"
         ? "My Profile"
+        : location.pathname === "/settings"
+          ? "Settings"
         : currentNav
           ? currentNav.label
           : "Dashboard";

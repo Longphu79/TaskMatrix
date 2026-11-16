@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Camera } from "lucide-react";
 import api, { getApiErrorMessage } from "../api";
 import { useAuth } from "../assets/context/AuthContext";
 
-const TABS = ["Overview", "Goals", "Projects", "Kudos"];
+const TABS = ["Overview", "Goals", "Projects"];
 const RECENT_WORK = [
     { title: "Untitled whiteboard", type: "Confluence Whiteboard", space: "SEP490", time: "2 hours ago", icon: "✣" },
     { title: "Giao diện cho customer", type: "Jira Issue", space: "SEP490", time: "2 months ago", icon: "▢" },
@@ -12,6 +13,22 @@ const RECENT_WORK = [
 
 const initials = (name = "") =>
     name.trim().split(/\s+/).filter(Boolean).slice(-2).map((part) => part[0]).join("").toUpperCase() || "U";
+
+async function createAvatarDataUrl(file) {
+    const bitmap = await createImageBitmap(file);
+    try {
+        const scale = Math.min(1, 512 / Math.max(bitmap.width, bitmap.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+        canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Could not process this image.");
+        context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL("image/jpeg", 0.82);
+    } finally {
+        bitmap.close();
+    }
+}
 
 function ProfileIcon({ children, className = "" }) {
     return (
@@ -224,6 +241,7 @@ export default function ProfilePage() {
     const { user, updateUser } = useAuth();
     const navigate = useNavigate();
     const coverInput = useRef(null);
+    const avatarInput = useRef(null);
     const [tab, setTab] = useState("Overview");
     const [profile, setProfile] = useState({
         fullName: user?.name || "",
@@ -304,6 +322,32 @@ export default function ProfilePage() {
         setCover(URL.createObjectURL(file));
     };
 
+    const selectAvatar = async (file) => {
+        if (!file) return;
+        if (!user) {
+            setError("Sign in to update your profile photo.");
+            return;
+        }
+        if (!file.type.startsWith("image/")) {
+            setError("Choose an image file for your profile photo.");
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            setError("Profile photos must be 5 MB or smaller.");
+            return;
+        }
+
+        setError("");
+        try {
+            const avatar = await createAvatarDataUrl(file);
+            updateUser({ avatar });
+            setNotice("Profile photo updated.");
+            window.setTimeout(() => setNotice(""), 3000);
+        } catch (avatarError) {
+            setError(avatarError?.message || "Could not update your profile photo.");
+        }
+    };
+
     return (
         <div className="min-h-full bg-white text-slate-800">
             <section className="relative flex h-36 items-start justify-center overflow-hidden bg-[#77859e] sm:h-40">
@@ -322,8 +366,33 @@ export default function ProfilePage() {
             </section>
 
             <div className="relative flex h-4 justify-between px-5 sm:px-8">
-                <div className="absolute -top-[98px] flex h-[100px] w-[100px] items-center justify-center rounded-full border-[3px] border-white bg-[#172b50] text-4xl font-medium text-white shadow-sm">
-                    {initials(profile.fullName)}
+                <div className="absolute -top-[98px]">
+                    <div className="relative flex h-[100px] w-[100px] items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-[#172b50] text-4xl font-medium text-white shadow-sm">
+                        {user?.avatar ? (
+                            <img src={user.avatar} alt={`${profile.fullName || "Profile"} profile photo`} className="h-full w-full object-cover" />
+                        ) : (
+                            initials(profile.fullName)
+                        )}
+                    </div>
+                    <input
+                        ref={avatarInput}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(event) => {
+                            selectAvatar(event.target.files?.[0]);
+                            event.target.value = "";
+                        }}
+                    />
+                    <button
+                        type="button"
+                        onClick={() => avatarInput.current?.click()}
+                        aria-label="Change profile photo"
+                        title="Change profile photo"
+                        className="absolute bottom-1 right-0 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-blue-600 text-white shadow transition hover:bg-blue-700"
+                    >
+                        <Camera size={17} aria-hidden="true" />
+                    </button>
                 </div>
             </div>
 
@@ -356,7 +425,7 @@ export default function ProfilePage() {
             ) : tab === "Projects" ? (
                 <EmptyTab title="Projects" description="Projects you join will appear here so teammates can see what you are working on." icon="▦" />
             ) : (
-                <EmptyTab title="Kudos" description="Recognition from your teammates will show up here." icon="✦" />
+                null
             )}
         </div>
     );

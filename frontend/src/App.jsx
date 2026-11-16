@@ -4,6 +4,7 @@ import Dashboard from "./pages/dashboard";
 import AnalyticsPage from "./pages/Analytics";
 import TimesheetsPage from "./pages/Timesheets";
 import TodoPage from "./pages/Todo";
+import BoardPage from "./pages/Board";
 import DocumentsPage from "./pages/Documents";
 import SettingsPage from "./pages/Settings";
 import ProfilePage from "./pages/Profile";
@@ -27,6 +28,7 @@ export default function App() {
                     <Route path="/analytics" element={<AnalyticsPage />} />
                     <Route path="/timesheets" element={<TimesheetsPage />} />
                     <Route path="/todo" element={<TodoPage />} />
+                    <Route path="/board" element={<BoardPage />} />
                     <Route path="/documents" element={<DocumentsPage />} />
                     <Route path="/profile" element={<ProfilePage />} />
                     <Route path="/settings" element={<SettingsPage />} />

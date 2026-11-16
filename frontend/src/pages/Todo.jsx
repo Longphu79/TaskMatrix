@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { loadTasks, saveTasks } from "../taskStore";
 import {
     ListIcon,
     ClockIcon,
@@ -21,63 +22,6 @@ const PRIORITY = {
     Medium: "bg-brand-soft text-[#a07a00]",
     Low: "bg-canvas text-muted",
 };
-
-const INITIAL_TASKS = [
-    {
-        id: 1,
-        title: "Creating Wireframe for Food Dashboard",
-        project: "Food Dashboard",
-        priority: "High",
-        progress: 78,
-        due: "Sep 08, 2026",
-        done: false,
-    },
-    {
-        id: 2,
-        title: "Research & Development for new module",
-        project: "Matrix Domain",
-        priority: "Medium",
-        progress: 40,
-        due: "Sep 10, 2026",
-        done: false,
-    },
-    {
-        id: 3,
-        title: "Prototype interaction states",
-        project: "Project Four",
-        priority: "High",
-        progress: 55,
-        due: "Sep 09, 2026",
-        done: false,
-    },
-    {
-        id: 4,
-        title: "Prepare client review deck",
-        project: "Project Three",
-        priority: "Low",
-        progress: 100,
-        due: "Sep 04, 2026",
-        done: true,
-    },
-    {
-        id: 5,
-        title: "Design QA and developer handoff",
-        project: "Food Dashboard",
-        priority: "Medium",
-        progress: 100,
-        due: "Sep 03, 2026",
-        done: true,
-    },
-    {
-        id: 6,
-        title: "Finalize typography and color tokens",
-        project: "Matrix Domain",
-        priority: "Low",
-        progress: 20,
-        due: "Sep 12, 2026",
-        done: false,
-    },
-];
 
 /* ---------- icons ---------- */
 
@@ -396,13 +340,17 @@ function TaskItem({ task, onToggle, onDelete }) {
 /* ---------- page ---------- */
 
 export default function TodoPage() {
-    const [tasks, setTasks] = useState(INITIAL_TASKS);
+    const [tasks, setTasks] = useState(loadTasks);
     const [tab, setTab] = useState("All");
     const [query, setQuery] = useState("");
     const [sort, setSort] = useState("priority");
     const [modalOpen, setModalOpen] = useState(false);
 
     const tabs = ["All Tasks", "In Progress", "Completed"];
+
+    useEffect(() => {
+        saveTasks(tasks);
+    }, [tasks]);
 
     const toggle = (id) =>
         setTasks((t) =>
@@ -412,6 +360,7 @@ export default function TodoPage() {
                           ...x,
                           done: !x.done,
                           progress: !x.done ? 100 : x.progress,
+                          status: !x.done ? "Done" : "To Do",
                       }
                     : x,
             ),
@@ -428,6 +377,7 @@ export default function TodoPage() {
                 progress: 0,
                 due: form.due || "No due date",
                 done: false,
+                status: "To Do",
             },
             ...t,
         ]);
