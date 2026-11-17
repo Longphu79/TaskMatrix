@@ -13,7 +13,7 @@ import Dashboard from "./pages/dashboard";
 import AnalyticsPage from "./pages/Analytics";
 import TimesheetsPage from "./features/Task/pages/Timesheets";
 import TodoPage from "./features/Task/pages/Todo";
-import ReportPage from "./pages/Report";
+import DocumentPage from "./pages/Documents";
 import SettingsPage from "./pages/Settings";
 import ChatPage from "./pages/Chat";
 import ManageMembers from "./pages/ManageMembers";
@@ -136,7 +136,7 @@ export default function App() {
                     <Route path="/ai-agent" element={<AiAgentChat />} />{" "}
                     {/* Route AI Agent mới */}
                     <Route path="/todo" element={<TodoPage />} />
-                    <Route path="/report" element={<ReportPage />} />
+                    <Route path="/documents" element={<DocumentPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     {/* Các Route dành riêng cho Công ty */}
                     <Route

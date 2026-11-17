@@ -27,6 +27,7 @@ builder.Services.AddScoped<TaskService>();
 builder.Services.AddSingleton<AiMemoryService>();
 builder.Services.AddScoped<WorkspaceService>();
 builder.Services.AddScoped<ChatService>();
+builder.Services.AddScoped<IDocumentService, DocumentService>();
 
 // Cấu hình nguyên bản của bạn (Không gán BaseAddress)
 builder.Services.AddHttpClient<AiService>(client =>

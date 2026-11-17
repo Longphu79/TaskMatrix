@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { SparkleIcon } from "../../../components/icon";
 import { useTasks } from "../../../context/TaskContext";
-import { aiApi } from "../api/aiApi"; // 🟢 Import aiApi vừa tạo
+import { aiApi } from "../api/aiApi";
 
 export default function AiAgentChat() {
     const { fetchTasks } = useTasks();
@@ -10,6 +10,11 @@ export default function AiAgentChat() {
     const [draft, setDraft] = useState("");
     const [loading, setLoading] = useState(false);
     const [fetchingHistory, setFetchingHistory] = useState(true);
+
+    // 🟢 State & Ref cho ảnh đính kèm
+    const [selectedImage, setSelectedImage] = useState(null);
+    const [previewUrl, setPreviewUrl] = useState(null);
+    const fileInputRef = useRef(null);
 
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [resetting, setResetting] = useState(false);
@@ -20,7 +25,6 @@ export default function AiAgentChat() {
         loadChatHistory();
     }, []);
 
-    // 🟢 Gọi qua aiApi.getHistory()
     const loadChatHistory = async () => {
         try {
             setFetchingHistory(true);
@@ -37,7 +41,7 @@ export default function AiAgentChat() {
                     {
                         id: 0,
                         from: "ai",
-                        text: "Xin chào! Tôi là trợ lý AI TaskMatrix. Hãy nhập yêu cầu tạo task bằng ngôn ngữ tự nhiên.",
+                        text: "Xin chào! Tôi là trợ lý AI TaskMatrix. Hãy nhập yêu cầu hoặc gửi ảnh để tôi hỗ trợ nhé.",
                     },
                 ]);
             }
@@ -47,7 +51,7 @@ export default function AiAgentChat() {
                 {
                     id: 0,
                     from: "ai",
-                    text: "Xin chào! Tôi là trợ lý AI TaskMatrix. Hãy nhập yêu cầu tạo task bằng ngôn ngữ tự nhiên.",
+                    text: "Xin chào! Tôi là trợ lý AI TaskMatrix. Hãy nhập yêu cầu hoặc gửi ảnh để tôi hỗ trợ nhé.",
                 },
             ]);
         } finally {
@@ -55,7 +59,6 @@ export default function AiAgentChat() {
         }
     };
 
-    // 🟢 Gọi qua aiApi.clearHistory()
     const handleConfirmReset = async () => {
         setResetting(true);
         try {
@@ -64,9 +67,10 @@ export default function AiAgentChat() {
                 {
                     id: 0,
                     from: "ai",
-                    text: "Xin chào! Tôi là trợ lý AI TaskMatrix. Hãy nhập yêu cầu tạo task bằng ngôn ngữ tự nhiên.",
+                    text: "Xin chào! Tôi là trợ lý AI TaskMatrix. Hãy nhập yêu cầu hoặc gửi ảnh để tôi hỗ trợ nhé.",
                 },
             ]);
+            clearSelectedImage();
             setShowConfirmModal(false);
         } catch (error) {
             console.error("Lỗi khi xóa lịch sử:", error);
@@ -79,28 +83,77 @@ export default function AiAgentChat() {
         end.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     }, [messages, loading]);
 
-    // 🟢 Gọi qua aiApi.parseAndCreate(...)
+    // 🟢 Xử lý chọn ảnh từ thiết bị
+    const handleImageSelect = (file) => {
+        if (!file) return;
+        const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+        if (!allowedTypes.includes(file.type)) {
+            alert("Vui lòng chỉ chọn ảnh định dạng JPG, PNG hoặc WEBP.");
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            alert("Dung lượng ảnh tối đa là 5MB.");
+            return;
+        }
+
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        setSelectedImage(file);
+        setPreviewUrl(URL.createObjectURL(file));
+    };
+
+    const clearSelectedImage = () => {
+        setSelectedImage(null);
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+
+    // 🟢 Hỗ trợ dán nhanh ảnh chụp màn hình (Ctrl + V)
+    const handlePaste = (e) => {
+        const imageItem = Array.from(e.clipboardData?.items || []).find(
+            (item) => item.type.startsWith("image/"),
+        );
+        if (imageItem) {
+            const file = imageItem.getAsFile();
+            if (file) handleImageSelect(file);
+        }
+    };
+
     const send = async (text) => {
-        if (!text.trim() || loading) return;
-
         const userText = text.trim();
+        if ((!userText && !selectedImage) || loading) return;
 
+        const imageToSend = selectedImage;
+        const localPreviewForBubble = previewUrl;
+
+        // Hiển thị ngay tin nhắn + ảnh lên khung chat
         setMessages((m) => [
             ...m,
-            { id: crypto.randomUUID(), from: "user", text: userText },
+            {
+                id: crypto.randomUUID(),
+                from: "user",
+                text: userText,
+                imageUrl: localPreviewForBubble,
+            },
         ]);
+
         setDraft("");
+        setSelectedImage(null);
+        setPreviewUrl(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
         setLoading(true);
 
         try {
             const res = await aiApi.parseAndCreate({
                 prompt: userText,
                 userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                image: imageToSend,
             });
 
             const isTaskAction = [
                 "CREATE_TASK",
                 "UPDATE_TASK",
+                "ADD_SUBTASKS",
                 "DELETE_TASK",
             ].includes(res.intent);
 
@@ -120,13 +173,13 @@ export default function AiAgentChat() {
             const errorMsg =
                 typeof error === "string"
                     ? error
-                    : "Không thể thực hiện thao tác từ câu lệnh này.";
+                    : error?.response?.data || "Không thể xử lý yêu cầu này.";
             setMessages((m) => [
                 ...m,
                 {
                     id: crypto.randomUUID(),
                     from: "ai",
-                    text: `❌ ${errorMsg}\nVui lòng thử lại với câu lệnh cụ thể hơn.`,
+                    text: `❌ ${errorMsg}\nVui lòng thử lại với câu lệnh hoặc hình ảnh rõ nét hơn.`,
                 },
             ]);
         } finally {
@@ -146,8 +199,8 @@ export default function AiAgentChat() {
                             TaskMatrix AI Agent
                         </h2>
                         <p className="text-xs text-muted">
-                            Tự động phân tích ngôn ngữ tự nhiên & đặt lịch vào
-                            hệ thống qua AI.
+                            Tự động phân tích ngôn ngữ tự nhiên, hình ảnh & đặt
+                            lịch vào hệ thống qua AI.
                         </p>
                     </div>
                 </div>
@@ -184,7 +237,14 @@ export default function AiAgentChat() {
                                         : "bg-canvas text-ink dark:bg-slate-700/50 dark:text-slate-100"
                                 }`}
                             >
-                                {m.text}
+                                {m.imageUrl && (
+                                    <img
+                                        src={m.imageUrl}
+                                        alt="Ảnh đính kèm"
+                                        className="mb-2 max-h-56 w-auto rounded-xl object-contain"
+                                    />
+                                )}
+                                {m.text && <div>{m.text}</div>}
                             </div>
                         </div>
                     ))
@@ -202,33 +262,114 @@ export default function AiAgentChat() {
                 <div ref={end} />
             </div>
 
+            {/* 🟢 Khu vực nhập liệu + Xem trước ảnh */}
             <form
                 onSubmit={(e) => {
                     e.preventDefault();
                     send(draft);
                 }}
-                className="flex gap-3"
+                className="space-y-2.5"
             >
-                <input
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    disabled={loading || fetchingHistory}
-                    placeholder="Nhập tin nhắn..."
-                    aria-label="Message"
-                    className="flex-1 rounded-xl border border-hairline bg-white px-4 py-2.5 text-sm text-ink outline-none transition placeholder:text-muted focus:border-brand disabled:opacity-60 dark:bg-slate-800 dark:border-slate-700/50 dark:text-white"
-                />
-                <button
-                    type="submit"
-                    disabled={loading || fetchingHistory || !draft.trim()}
-                    className="rounded-xl bg-ink px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-black disabled:opacity-50 dark:!bg-brand dark:!text-slate-900"
-                >
-                    {loading ? "Đang xử lý..." : "Gửi"}
-                </button>
+                {/* Khung xem trước ảnh nhỏ gọn phía trên thanh nhập */}
+                {previewUrl && (
+                    <div className="inline-flex items-center gap-3 rounded-2xl border border-hairline bg-canvas/70 p-2 pr-3 dark:border-slate-700 dark:bg-slate-800/80">
+                        <img
+                            src={previewUrl}
+                            alt="Xem trước"
+                            className="h-12 w-12 rounded-xl object-cover"
+                        />
+                        <div className="max-w-[180px] truncate text-xs">
+                            <p className="truncate font-semibold text-ink dark:text-white">
+                                {selectedImage?.name}
+                            </p>
+                            <p className="text-[11px] text-muted">
+                                {selectedImage
+                                    ? `${(selectedImage.size / 1024).toFixed(0)} KB`
+                                    : ""}
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={clearSelectedImage}
+                            title="Bỏ chọn ảnh"
+                            className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-200/80 text-xs font-bold text-ink transition hover:bg-red-500 hover:text-white dark:bg-slate-700 dark:text-slate-200"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                )}
+
+                {/* Thanh nhập tin nhắn tích hợp nút chọn ảnh bên trái */}
+                <div className="flex items-center gap-2 rounded-2xl border border-hairline bg-white p-1.5 pl-2 transition focus-within:border-brand dark:border-slate-700/50 dark:bg-slate-800">
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={(e) => {
+                            handleImageSelect(e.target.files?.[0]);
+                            e.target.value = "";
+                        }}
+                        className="hidden"
+                    />
+
+                    <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={loading || fetchingHistory}
+                        title="Chọn ảnh từ thiết bị (JPG, PNG, WEBP < 5MB)"
+                        aria-label="Chọn ảnh từ thiết bị"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted transition hover:bg-slate-100 hover:text-ink disabled:opacity-50 dark:hover:bg-slate-700 dark:hover:text-white"
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="h-5 w-5"
+                        >
+                            <rect
+                                width="18"
+                                height="18"
+                                x="3"
+                                y="3"
+                                rx="2"
+                                ry="2"
+                            />
+                            <circle cx="9" cy="9" r="2" />
+                            <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                        </svg>
+                    </button>
+
+                    <input
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        onPaste={handlePaste}
+                        disabled={loading || fetchingHistory}
+                        placeholder="Nhập tin nhắn hoặc chọn/dán ảnh..."
+                        aria-label="Message"
+                        className="flex-1 bg-transparent px-2 py-2 text-sm text-ink outline-none placeholder:text-muted disabled:opacity-60 dark:text-white"
+                    />
+
+                    <button
+                        type="submit"
+                        disabled={
+                            loading ||
+                            fetchingHistory ||
+                            (!draft.trim() && !selectedImage)
+                        }
+                        className="shrink-0 rounded-xl bg-ink px-5 py-2 text-sm font-semibold text-white transition hover:bg-black disabled:opacity-50 dark:!bg-brand dark:!text-slate-900"
+                    >
+                        {loading ? "Đang xử lý..." : "Gửi"}
+                    </button>
+                </div>
             </form>
 
             {showConfirmModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                    <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl transition-all dark:bg-slate-800 dark:border dark:border-slate-700">
+                    <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl transition-all dark:border dark:border-slate-700 dark:bg-slate-800">
                         <h3 className="text-base font-bold text-ink dark:text-white">
                             Bắt đầu cuộc trò chuyện mới?
                         </h3>
@@ -241,7 +382,7 @@ export default function AiAgentChat() {
                                 type="button"
                                 onClick={() => setShowConfirmModal(false)}
                                 disabled={resetting}
-                                className="rounded-xl border border-hairline px-4 py-2 text-xs font-semibold text-muted transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-700 dark:text-slate-300"
+                                className="rounded-xl border border-hairline px-4 py-2 text-xs font-semibold text-muted transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700"
                             >
                                 Hủy bỏ
                             </button>

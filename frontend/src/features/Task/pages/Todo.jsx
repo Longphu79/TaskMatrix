@@ -80,6 +80,7 @@ function durationLabel(task) {
     return h && m ? `${h}h ${m}m` : h ? `${h}h` : `${m}m`;
 }
 
+// Lấy progress (nếu Done -> 100%, nếu có subtasks thì do Context tính, ko thì lấy Progress tay)
 const progressOf = (t) => (t.status === "Completed" ? 100 : (t.progress ?? 0));
 
 function aiKey(task) {
@@ -105,20 +106,124 @@ const AI_BADGE = {
 
 /* ---------- Sub Components ---------- */
 
-function Bar({ value }) {
+// 1. Icon cho Checklist
+const small = {
+    width: 14,
+    height: 14,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.9,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+};
+const ChevronIcon = (p) => (
+    <svg width={16} height={16} {...{ ...small, width: 16, height: 16 }} {...p}>
+        <path d="m6 9 6 6 6-6" />
+    </svg>
+);
+const TrashSmall = (p) => (
+    <svg {...small} {...p}>
+        <path d="M3 6h18M8 6V4h8v2m-9 0v14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V6M10 11v6M14 11v6" />
+    </svg>
+);
+
+// 2. Component Checklist Mới Thêm Vào
+function Checklist({ task, onAddSub, onToggleSub, onDeleteSub }) {
+    const [title, setTitle] = useState("");
+    const subs = task.subTasks ?? []; // Khớp với BE C# (`subTasks`)
+
+    const submit = (e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        if (!title.trim()) return;
+        onAddSub(task.id || task._id, title);
+        setTitle("");
+    };
+
     return (
-        <div className="flex items-center gap-3">
-            <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-hairline dark:bg-slate-800">
-                <div
-                    className={`h-full rounded-full transition-all duration-700 ease-out ${
-                        value >= 100 ? "bg-[#3fb27f]" : "bg-brand"
-                    }`}
-                    style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
-                />
+        <div
+            className="mt-4 max-w-xl rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50"
+            onClick={(e) => e.stopPropagation()}
+        >
+            <ul aria-label="Sub-tasks" className="space-y-0.5">
+                {subs.map((s) => (
+                    <li
+                        key={s.id}
+                        className="group/sub flex items-center gap-3 rounded-lg px-2 py-1.5 transition hover:bg-white dark:hover:bg-slate-700/50"
+                    >
+                        <button
+                            role="checkbox"
+                            aria-checked={s.isCompleted}
+                            onClick={() =>
+                                onToggleSub(task.id || task._id, s.id)
+                            }
+                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition ${
+                                s.isCompleted
+                                    ? "border-[#3fb27f] bg-[#3fb27f] text-white"
+                                    : "border-slate-300 bg-white hover:border-brand dark:border-slate-600 dark:bg-slate-800"
+                            }`}
+                        >
+                            {s.isCompleted && (
+                                <CheckIcon width={12} height={12} />
+                            )}
+                        </button>
+                        <span
+                            className={`min-w-0 flex-1 text-[13px] font-medium break-words transition ${
+                                s.isCompleted
+                                    ? "text-slate-400 line-through"
+                                    : "text-slate-700 dark:text-slate-300"
+                            }`}
+                        >
+                            {s.title}
+                        </span>
+                        <button
+                            onClick={() =>
+                                onDeleteSub(task.id || task._id, s.id)
+                            }
+                            className="rounded-md p-1.5 text-slate-400 opacity-0 transition group-focus-within/sub:opacity-100 group-hover/sub:opacity-100 hover:bg-[#fdecec] hover:text-[#e05656]"
+                        >
+                            <TrashSmall />
+                        </button>
+                    </li>
+                ))}
+            </ul>
+            <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onKeyDown={submit}
+                placeholder="+ Add sub-task..."
+                className={`w-full rounded-lg bg-transparent px-2 py-2 text-[13px] font-medium text-slate-700 outline-none placeholder:text-slate-400 focus:bg-white dark:text-slate-200 dark:focus:bg-slate-700/50 ${subs.length ? "mt-2" : ""}`}
+            />
+        </div>
+    );
+}
+
+function Bar({ value, subTasksCount }) {
+    return (
+        <div>
+            <div className="flex items-center gap-3">
+                <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-hairline dark:bg-slate-800">
+                    <div
+                        className={`h-full rounded-full transition-all duration-700 ease-out ${
+                            value >= 100 ? "bg-[#3fb27f]" : "bg-brand"
+                        }`}
+                        style={{
+                            width: `${Math.min(100, Math.max(0, value))}%`,
+                        }}
+                    />
+                </div>
+                <span className="shrink-0 rounded-full bg-brand-soft px-2.5 py-0.5 text-xs font-bold text-ink dark:bg-brand/20 dark:text-brand">
+                    {value}% done
+                </span>
             </div>
-            <span className="shrink-0 rounded-full bg-brand-soft px-2.5 py-0.5 text-xs font-bold text-ink dark:bg-brand/20 dark:text-brand">
-                {value}% done
-            </span>
+            {/* Hiển thị "1 of 3 sub-tasks" nếu có subtask giống trong ảnh */}
+            {subTasksCount > 0 && (
+                <div className="mt-1.5 text-[11px] font-medium text-slate-500">
+                    {Math.round((value / 100) * subTasksCount)} of{" "}
+                    {subTasksCount} sub-tasks
+                </div>
+            )}
         </div>
     );
 }
@@ -150,8 +255,11 @@ function SummaryCard({ label, value, accent, Icon }) {
     );
 }
 
-function TaskItem({ task, onToggle, onDelete, onVerify, onEdit }) {
+// 3. Update TaskItem thêm Expand/Collapse Checklist
+function TaskItem({ task, onToggle, onDelete, onVerify, onEdit, updateTask }) {
     const [menuOpen, setMenuOpen] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false); // Trạng thái mở Accordion
+
     if (!task) return null;
 
     const taskId = task.id || task._id;
@@ -161,138 +269,231 @@ function TaskItem({ task, onToggle, onDelete, onVerify, onEdit }) {
     const key = aiKey(task);
     const badge = key && AI_BADGE[key];
     const verified = task.aiStatus === "verified";
+    const subTasks = task.subTasks || [];
+
+    // --- XỬ LÝ SUB-TASKS & TỰ ĐỘNG TÍNH LẠI % CỦA TASK MẸ ---
+    const calculateProgress = (newSubTasks) => {
+        if (newSubTasks.length === 0)
+            return task.status === "Completed" ? 100 : 0;
+        const doneCount = newSubTasks.filter((s) => s.isCompleted).length;
+        return Math.round((doneCount / newSubTasks.length) * 100);
+    };
+
+    const handleAddSubTask = (id, title) => {
+        const generateObjectId = () =>
+            [...Array(24)]
+                .map(() => Math.floor(Math.random() * 16).toString(16))
+                .join("");
+
+        const newSubTasks = [
+            ...subTasks,
+            { id: generateObjectId(), title, isCompleted: false },
+        ];
+
+        const newProgress = calculateProgress(newSubTasks);
+        updateTask(taskId, {
+            subTasks: newSubTasks,
+            progress: newProgress,
+            status: newProgress === 100 ? "Completed" : "Pending",
+        });
+    };
+
+    const handleToggleSubTask = (id, subId) => {
+        const newSubTasks = subTasks.map((s) =>
+            s.id === subId ? { ...s, isCompleted: !s.isCompleted } : s,
+        );
+        const newProgress = calculateProgress(newSubTasks);
+        updateTask(taskId, {
+            subTasks: newSubTasks,
+            progress: newProgress,
+            status: newProgress === 100 ? "Completed" : "Pending",
+        });
+    };
+
+    const handleDeleteSubTask = (id, subId) => {
+        const newSubTasks = subTasks.filter((s) => s.id !== subId);
+        const newProgress = calculateProgress(newSubTasks);
+        updateTask(taskId, {
+            subTasks: newSubTasks,
+            progress: newProgress,
+            status: newProgress === 100 ? "Completed" : "Pending",
+        });
+    };
+
+    // Khi click Check Task chính: Tick xanh toàn bộ subtask
+    const handleMainToggle = () => {
+        if (subTasks.length > 0) {
+            const markDone = progress < 100;
+            const newSubTasks = subTasks.map((s) => ({
+                ...s,
+                isCompleted: markDone,
+            }));
+            updateTask(taskId, {
+                subTasks: newSubTasks,
+                progress: markDone ? 100 : 0,
+                status: markDone ? "Completed" : "Pending",
+            });
+        } else {
+            onToggle(taskId); // Giữ nguyên luồng cũ nếu ko có subtask
+        }
+    };
 
     return (
-        <div className="flex flex-wrap items-center gap-4 rounded-3xl border border-hairline bg-white p-5 shadow-[0_8px_30px_rgba(17,17,26,0.03)] transition hover:border-brand/60 dark:bg-slate-900 dark:border-slate-800 sm:flex-nowrap">
-            <button
-                onClick={() => onToggle(taskId)}
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border transition ${
-                    done
-                        ? "border-[#3fb27f] bg-[#3fb27f] text-white"
-                        : "border-hairline hover:border-brand dark:border-slate-700"
-                }`}
-            >
-                {done && <CheckIcon />}
-            </button>
+        <div className="rounded-3xl border border-hairline bg-white p-5 shadow-[0_8px_30px_rgba(17,17,26,0.03)] transition hover:border-brand/60 dark:bg-slate-900 dark:border-slate-800">
+            <div className="flex flex-wrap items-center gap-4 sm:flex-nowrap">
+                <button
+                    onClick={handleMainToggle}
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border transition ${
+                        done
+                            ? "border-[#3fb27f] bg-[#3fb27f] text-white"
+                            : "border-hairline hover:border-brand dark:border-slate-700 dark:bg-slate-800"
+                    }`}
+                >
+                    {done && <CheckIcon />}
+                </button>
 
-            <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                    <span
-                        className={`truncate text-sm font-semibold ${
-                            done
-                                ? "text-muted line-through"
-                                : "text-ink dark:text-white"
-                        }`}
-                    >
-                        {task.title}
-                    </span>
-                    <span
-                        className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${
-                            PRIORITY[task.priority] || PRIORITY.Medium
-                        }`}
-                    >
-                        {task.priority || "Medium"}
-                    </span>
-                    {badge && (
+                <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
                         <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${badge.cls}`}
+                            className={`truncate text-[15px] font-bold ${
+                                done
+                                    ? "text-muted line-through"
+                                    : "text-ink dark:text-white"
+                            }`}
                         >
-                            {key === "verified" && (
-                                <CheckIcon width={10} height={10} />
-                            )}
-                            {badge.label}
+                            {task.title}
                         </span>
-                    )}
-                </div>
-
-                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink dark:text-slate-300">
                         <span
-                            className="h-2.5 w-2.5 rounded-full"
-                            style={{ background: color }}
-                        />
-                        {task.project || task.workspaceId || "General"}
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted">
-                        <CalendarIcon className="text-muted" />
-                        {formatDue(task.dueDate)}
-                    </span>
-                    {task.startTime && (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted">
-                            <ClockSmallIcon className="text-muted" />
-                            {format12(task.startTime)} –{" "}
-                            {format12(task.endTime)}
-                            <span className="text-muted/70">
-                                ({durationLabel(task)})
-                            </span>
+                            className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${
+                                PRIORITY[task.priority] || PRIORITY.Medium
+                            }`}
+                        >
+                            {task.priority || "Medium"}
                         </span>
+                        {badge && (
+                            <span
+                                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${badge.cls}`}
+                            >
+                                {key === "verified" && (
+                                    <CheckIcon width={10} height={10} />
+                                )}
+                                {badge.label}
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-2">
+                        <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink dark:text-slate-300">
+                            <span
+                                className="h-2.5 w-2.5 rounded-full"
+                                style={{ background: color }}
+                            />
+                            {task.project || task.workspaceId || "General"}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-muted">
+                            <CalendarIcon className="text-muted w-4 h-4" />
+                            {formatDue(task.dueDate)}
+                        </span>
+                        {task.startTime && (
+                            <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-muted">
+                                <ClockSmallIcon className="text-muted w-4 h-4" />
+                                {format12(task.startTime)} –{" "}
+                                {format12(task.endTime)}
+                                <span className="text-muted/70">
+                                    ({durationLabel(task)})
+                                </span>
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="mt-3.5 max-w-md">
+                        <Bar value={progress} subTasksCount={subTasks.length} />
+                    </div>
+
+                    {task.aiVerificationReason && (
+                        <p className="mt-2 line-clamp-2 text-[13px] text-muted dark:text-slate-400">
+                            AI: {task.aiVerificationReason}
+                        </p>
                     )}
                 </div>
 
-                <div className="mt-3 max-w-md">
-                    <Bar value={progress} />
-                </div>
-                {task.aiVerificationReason && (
-                    <p className="mt-2 line-clamp-2 text-xs text-muted dark:text-slate-400">
-                        AI: {task.aiVerificationReason}
-                    </p>
+                {!verified && (
+                    <button
+                        onClick={() => onVerify(taskId)}
+                        className="flex h-10 shrink-0 items-center gap-2 rounded-2xl bg-brand px-4 text-[13px] font-bold text-ink transition hover:brightness-95 dark:text-slate-900"
+                    >
+                        <SparkleIcon width={16} height={16} /> AI Verify Proof
+                    </button>
                 )}
-            </div>
 
-            {!verified && (
-                <button
-                    onClick={() => onVerify(taskId)}
-                    className="flex h-10 shrink-0 items-center gap-2 rounded-2xl bg-brand px-4 text-sm font-bold text-ink transition hover:brightness-95 dark:text-slate-900"
-                >
-                    <SparkleIcon width={16} height={16} /> AI Verify Proof
-                </button>
-            )}
-
-            <div className="relative shrink-0">
-                <button
-                    onClick={() => setMenuOpen((o) => !o)}
-                    className="rounded-lg p-1.5 text-muted transition hover:bg-canvas hover:text-ink dark:hover:bg-slate-800 dark:hover:text-white"
-                >
-                    <MoreIcon width={18} height={18} />
-                </button>
-                {menuOpen && (
-                    <>
-                        <div
-                            className="fixed inset-0 z-10"
-                            onClick={() => setMenuOpen(false)}
+                <div className="relative flex shrink-0 items-center gap-1">
+                    {/* Expand Sub-tasks Button */}
+                    <button
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className={`rounded-lg p-2 text-muted transition hover:bg-canvas hover:text-ink dark:hover:bg-slate-800 dark:hover:text-white ${isExpanded ? "bg-canvas dark:bg-slate-800" : ""}`}
+                    >
+                        <ChevronIcon
+                            className={`transition-transform ${isExpanded ? "rotate-180" : ""}`}
                         />
-                        <div className="absolute right-0 top-9 z-20 w-36 overflow-hidden rounded-xl border border-hairline bg-white py-1 shadow-xl dark:bg-slate-800 dark:border-slate-700">
-                            <button
-                                onClick={() => {
-                                    onToggle(taskId);
-                                    setMenuOpen(false);
-                                }}
-                                className="block w-full px-4 py-2 text-left text-sm text-ink hover:bg-canvas dark:text-white dark:hover:bg-slate-700"
-                            >
-                                {done ? "Mark active" : "Mark done"}
-                            </button>
-                            <button
-                                onClick={() => {
-                                    onEdit(taskId);
-                                    setMenuOpen(false);
-                                }}
-                                className="block w-full px-4 py-2 text-left text-sm text-ink hover:bg-canvas dark:text-white dark:hover:bg-slate-700"
-                            >
-                                Edit task
-                            </button>
-                            <button
-                                onClick={() => {
-                                    onDelete(taskId);
-                                    setMenuOpen(false);
-                                }}
-                                className="block w-full px-4 py-2 text-left text-sm text-[#e05656] hover:bg-[#fdecec] dark:hover:bg-rose-950/30"
-                            >
-                                Delete
-                            </button>
-                        </div>
-                    </>
-                )}
+                    </button>
+
+                    {/* Menu Button */}
+                    <button
+                        onClick={() => setMenuOpen((o) => !o)}
+                        className="rounded-lg p-2 text-muted transition hover:bg-canvas hover:text-ink dark:hover:bg-slate-800 dark:hover:text-white"
+                    >
+                        <MoreIcon width={18} height={18} />
+                    </button>
+
+                    {menuOpen && (
+                        <>
+                            <div
+                                className="fixed inset-0 z-10"
+                                onClick={() => setMenuOpen(false)}
+                            />
+                            <div className="absolute right-0 top-10 z-20 w-36 overflow-hidden rounded-xl border border-hairline bg-white py-1 shadow-xl dark:bg-slate-800 dark:border-slate-700">
+                                <button
+                                    onClick={() => {
+                                        handleMainToggle();
+                                        setMenuOpen(false);
+                                    }}
+                                    className="block w-full px-4 py-2 text-left text-sm text-ink hover:bg-canvas dark:text-white dark:hover:bg-slate-700"
+                                >
+                                    {done ? "Mark active" : "Mark done"}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        onEdit(taskId);
+                                        setMenuOpen(false);
+                                    }}
+                                    className="block w-full px-4 py-2 text-left text-sm text-ink hover:bg-canvas dark:text-white dark:hover:bg-slate-700"
+                                >
+                                    Edit task
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        onDelete(taskId);
+                                        setMenuOpen(false);
+                                    }}
+                                    className="block w-full px-4 py-2 text-left text-sm text-[#e05656] hover:bg-[#fdecec] dark:hover:bg-rose-950/30"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </div>
             </div>
+
+            {/* Checklist Box */}
+            {isExpanded && (
+                <Checklist
+                    task={task}
+                    onAddSub={handleAddSubTask}
+                    onToggleSub={handleToggleSubTask}
+                    onDeleteSub={handleDeleteSubTask}
+                />
+            )}
         </div>
     );
 }
@@ -418,7 +619,7 @@ export default function TodoPage() {
                             onClick={() =>
                                 setTab(t === "All Tasks" ? "All" : t)
                             }
-                            className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                            className={`rounded-full px-4 py-1.5 text-[13px] font-bold transition ${
                                 (tab === "All" && t === "All Tasks") ||
                                 tab === t
                                     ? "bg-ink text-white dark:bg-brand dark:text-slate-900"
@@ -435,19 +636,19 @@ export default function TodoPage() {
                         <SearchIcon
                             width={16}
                             height={16}
-                            className="pointer-events-none absolute left-3.5 text-muted"
+                            className="pointer-events-none absolute left-4 text-muted"
                         />
                         <input
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                             placeholder="Search tasks..."
-                            className="w-full rounded-full border border-hairline bg-white py-2.5 pl-10 pr-4 text-sm text-ink outline-none transition focus:border-brand dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                            className="w-full rounded-full border border-hairline bg-white py-2.5 pl-10 pr-4 text-[13px] font-medium text-ink outline-none transition focus:border-brand dark:bg-slate-800 dark:border-slate-700 dark:text-white"
                         />
                     </div>
                     <select
                         value={sort}
                         onChange={(e) => setSort(e.target.value)}
-                        className="rounded-full border border-hairline bg-white px-4 py-2.5 text-sm font-medium text-ink outline-none transition focus:border-brand dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                        className="rounded-full border border-hairline bg-white px-4 py-2.5 text-[13px] font-bold text-ink outline-none transition focus:border-brand dark:bg-slate-800 dark:border-slate-700 dark:text-white"
                     >
                         <option value="priority">Sort: Priority</option>
                         <option value="due">Sort: Due date</option>
@@ -461,13 +662,14 @@ export default function TodoPage() {
                     Loading tasks from database…
                 </div>
             ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                     {filtered.map((task) => (
                         <TaskItem
                             key={task.id || task._id}
                             task={task}
                             onToggle={toggleTask}
                             onDelete={deleteTask}
+                            updateTask={updateTask}
                             onVerify={(id) => setProofId(id)}
                             onEdit={(id) => setEditId(id)}
                         />
@@ -488,7 +690,6 @@ export default function TodoPage() {
                     onClose={() => setEditId(null)}
                     onSave={async (id, patch) => {
                         await updateTask(id, patch);
-                        // 🟢 Đã bỏ setEditId(null) tại đây để Modal tự quản lý việc đóng sau khi hiện thông báo 800ms
                     }}
                     onDelete={async (id) => {
                         await deleteTask(id);

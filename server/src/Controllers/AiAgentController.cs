@@ -50,26 +50,50 @@ public class AiAgentController : ControllerBase
     }
 
     [HttpPost("parse-and-create")]
-    public async Task<IActionResult> ProcessPrompt([FromBody] AiParseTaskRequest request)
+    [RequestSizeLimit(5 * 1024 * 1024)] // 🟢 Giới hạn ảnh tối đa 5MB
+    public async Task<IActionResult> ProcessPrompt([FromForm] AiParseTaskRequest request)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrEmpty(userId)) return Unauthorized();
 
-        var aiResult = await _aiService.ProcessUserPromptAsync(userId, request.Prompt, request.UserTimeZone);
+        if (string.IsNullOrWhiteSpace(request.Prompt) && request.Image == null)
+            return BadRequest("Vui lòng nhập tin nhắn hoặc chọn hình ảnh.");
+
+        if (request.Image != null)
+        {
+            var allowedTypes = new[] { "image/jpeg", "image/png", "image/webp" };
+            if (!allowedTypes.Contains(request.Image.ContentType.ToLowerInvariant()))
+                return BadRequest("Chỉ hỗ trợ định dạng ảnh JPG, PNG hoặc WEBP.");
+        }
+
+        // 🟢 Truyền thêm request.Image vào AiService
+        var aiResult = await _aiService.ProcessUserPromptAsync(
+            userId,
+            request.Prompt,
+            request.UserTimeZone,
+            request.Image
+        );
         if (aiResult == null) return BadRequest("Không thể xử lý yêu cầu từ AI.");
 
-        // 🟢 1. TRƯỜNG HỢP: TẠO TASK (CREATE_TASK)
+        // 🟢 1. TRƯỜNG HỢP: TẠO TASK MỚI (KÈM SUB-TASKS NẾU CÓ)
         if (aiResult.Intent == "CREATE_TASK" && aiResult.Task != null)
         {
             var newTask = new TaskItem
             {
                 Title = aiResult.Task.Title,
                 Description = aiResult.Task.Description,
-                Priority = aiResult.Task.Priority,
+                Priority = string.IsNullOrWhiteSpace(aiResult.Task.Priority) ? "Medium" : aiResult.Task.Priority,
                 DueDate = aiResult.Task.DueDate,
                 StartTime = aiResult.Task.StartTime,
                 EndTime = aiResult.Task.EndTime,
-                Status = "Todo"
+                Status = "Pending",
+                SubTasks = aiResult.Task.SubTasks?
+                    .Where(s => !string.IsNullOrWhiteSpace(s.Title))
+                    .Select(s => new SubTaskItem
+                    {
+                        Title = s.Title.Trim(),
+                        IsCompleted = s.IsCompleted
+                    }).ToList() ?? new List<SubTaskItem>()
             };
 
             var createdTask = await _taskService.CreateTaskAsync(userId, newTask);
@@ -81,12 +105,63 @@ public class AiAgentController : ControllerBase
                 task = createdTask
             });
         }
-        // 🟢 2. TRƯỜNG HỢP: CẬP NHẬT TASK (UPDATE_TASK)
+
+        // 🟢 2. TRƯỜNG HỢP: THÊM SUB-TASKS VÀO TASK ĐÃ CÓ (ADD_SUBTASKS)
+        if (aiResult.Intent == "ADD_SUBTASKS")
+        {
+            var userTasks = await _taskService.GetTasksByWorkspaceAsync("personal", userId);
+            var targetTitle = aiResult.TargetTaskTitle ?? aiResult.Task?.Title;
+
+            // Ưu tiên tìm chính xác theo TargetTaskId trước, sau đó mới tìm theo tên
+            var targetTask = userTasks.FirstOrDefault(t =>
+                !string.IsNullOrEmpty(aiResult.TargetTaskId) && t.Id == aiResult.TargetTaskId);
+
+            targetTask ??= userTasks.FirstOrDefault(t =>
+                !string.IsNullOrWhiteSpace(targetTitle) &&
+                t.Title.Contains(targetTitle, StringComparison.OrdinalIgnoreCase));
+
+            var subItems = aiResult.Task?.SubTasks?
+                .Where(s => !string.IsNullOrWhiteSpace(s.Title))
+                .Select(s => new SubTaskItem
+                {
+                    Title = s.Title.Trim(),
+                    IsCompleted = s.IsCompleted
+                }).ToList() ?? new List<SubTaskItem>();
+
+            if (targetTask != null && subItems.Count > 0)
+            {
+                targetTask.SubTasks ??= new List<SubTaskItem>();
+                targetTask.SubTasks.AddRange(subItems);
+
+                // UpdateTaskAsync sẽ tự cấp ObjectId cho SubTaskItem và tính lại % Progress
+                await _taskService.UpdateTaskAsync(targetTask.Id!, userId, targetTask);
+
+                return Ok(new
+                {
+                    intent = "ADD_SUBTASKS",
+                    message = aiResult.ReplyMessage,
+                    task = targetTask
+                });
+            }
+
+            return Ok(new
+            {
+                intent = "CHAT",
+                message = $"Dạ, mình chưa tìm thấy công việc \"{targetTitle}\" trong danh sách của bạn để thêm việc nhỏ. Bạn kiểm tra lại tên task giúp mình nhé!",
+                task = (TaskItem?)null
+            });
+        }
+
+        // 🟢 3. TRƯỜNG HỢP: CẬP NHẬT TASK (UPDATE_TASK)
         if (aiResult.Intent == "UPDATE_TASK")
         {
             var userTasks = await _taskService.GetTasksByWorkspaceAsync("personal", userId);
 
+            // Ưu tiên khớp đúng ID để không sửa nhầm task trùng tên
             var targetTask = userTasks.FirstOrDefault(t =>
+                !string.IsNullOrEmpty(aiResult.TargetTaskId) && t.Id == aiResult.TargetTaskId);
+
+            targetTask ??= userTasks.FirstOrDefault(t =>
                 !string.IsNullOrEmpty(aiResult.TargetTaskTitle) &&
                 t.Title.Contains(aiResult.TargetTaskTitle, StringComparison.OrdinalIgnoreCase));
 
@@ -101,7 +176,19 @@ public class AiAgentController : ControllerBase
                 if (!string.IsNullOrEmpty(aiResult.Task.Priority)) targetTask.Priority = aiResult.Task.Priority;
                 if (!string.IsNullOrEmpty(aiResult.Task.Description)) targetTask.Description = aiResult.Task.Description;
 
-                await _taskService.UpdateTaskAsync(targetTask.Id, userId, targetTask);
+                if (aiResult.Task.SubTasks != null && aiResult.Task.SubTasks.Count > 0)
+                {
+                    targetTask.SubTasks ??= new List<SubTaskItem>();
+                    targetTask.SubTasks.AddRange(aiResult.Task.SubTasks
+                        .Where(s => !string.IsNullOrWhiteSpace(s.Title))
+                        .Select(s => new SubTaskItem
+                        {
+                            Title = s.Title.Trim(),
+                            IsCompleted = s.IsCompleted
+                        }));
+                }
+
+                await _taskService.UpdateTaskAsync(targetTask.Id!, userId, targetTask);
 
                 return Ok(new
                 {
@@ -112,12 +199,16 @@ public class AiAgentController : ControllerBase
             }
         }
 
-        // 🟢 3. TRƯỜNG HỢP: XÓA TASK (DELETE_TASK)
+        // 🟢 4. TRƯỜNG HỢP: XÓA TASK (DELETE_TASK)
         if (aiResult.Intent == "DELETE_TASK")
         {
             var userTasks = await _taskService.GetTasksByWorkspaceAsync("personal", userId);
 
+            // Ưu tiên khớp đúng ID để không xóa nhầm task trùng tên khác giờ
             var targetTask = userTasks.FirstOrDefault(t =>
+                !string.IsNullOrEmpty(aiResult.TargetTaskId) && t.Id == aiResult.TargetTaskId);
+
+            targetTask ??= userTasks.FirstOrDefault(t =>
                 !string.IsNullOrEmpty(aiResult.TargetTaskTitle) &&
                 t.Title.Contains(aiResult.TargetTaskTitle, StringComparison.OrdinalIgnoreCase));
 
@@ -125,7 +216,7 @@ public class AiAgentController : ControllerBase
 
             if (targetTask != null)
             {
-                await _taskService.DeleteTaskAsync(targetTask.Id, userId);
+                await _taskService.DeleteTaskAsync(targetTask.Id!, userId);
 
                 return Ok(new
                 {
@@ -136,7 +227,7 @@ public class AiAgentController : ControllerBase
             }
         }
 
-        // 🟢 4. TRƯỜNG HỢP: TRÒ CHUYỆN THÔNG THƯỜNG (CHAT)
+        // 🟢 5. TRƯỜNG HỢP: TRÒ CHUYỆN THÔNG THƯỜNG (CHAT)
         return Ok(new
         {
             intent = "CHAT",
@@ -165,7 +256,6 @@ public class AiAgentController : ControllerBase
         var task = await _taskService.GetTaskByIdAsync(taskId);
         if (task == null) return NotFound("Không tìm thấy công việc cần xác minh.");
 
-        // Gọi AI Vision phân tích ảnh
         var aiResult = await _visionService.VerifyTaskProofAsync(
             task.Title,
             task.Description ?? "",
@@ -176,15 +266,14 @@ public class AiAgentController : ControllerBase
 
         if (aiResult == null) return BadRequest("Không thể phân tích hình ảnh minh chứng.");
 
-        // Luôn ghi lại lý do nhận xét từ AI
         task.AiVerificationReason = aiResult.Reasoning;
         if (!string.IsNullOrEmpty(aiResult.ProofImageUrl))
         {
             task.ProofImageUrl = aiResult.ProofImageUrl;
         }
+
         if (aiResult.Ok)
         {
-            // Ưu tiên % AI chấm, nếu không có thì lấy % người dùng đề xuất
             int newProgress = aiResult.Progress > 0 ? aiResult.Progress : (request.ClaimedProgress ?? 100);
             task.Progress = Math.Clamp(newProgress, 0, 100);
             task.AiStatus = "verified";
@@ -201,10 +290,9 @@ public class AiAgentController : ControllerBase
         }
         else
         {
-            // Khi AI từ chối: Giữ nguyên task.Progress và task.Status cũ trong DB
             task.AiStatus = "feedback";
         }
-        // Lưu thay đổi vào MongoDB
+
         await _taskService.UpdateTaskAsync(taskId, userId, task);
 
         return Ok(aiResult);

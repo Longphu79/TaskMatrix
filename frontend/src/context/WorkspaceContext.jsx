@@ -132,7 +132,7 @@ export function WorkspaceProvider({ children }) {
                   { path: "/timesheets", label: "Timesheets", Icon: ClockIcon },
                   { path: "/ai-agent", label: "AI Agent", Icon: RobotIcon },
                   { path: "/todo", label: "Todo List", Icon: ListIcon },
-                  { path: "/report", label: "Reports", Icon: FileIcon },
+                  { path: "/documents", label: "Documents", Icon: FileIcon },
                   { path: "/settings", label: "Settings", Icon: SettingsIcon },
               ]
             : [
@@ -153,7 +153,11 @@ export function WorkspaceProvider({ children }) {
                       label: "Team Timesheets",
                       Icon: ClockIcon,
                   },
-                  { path: "/report", label: "Team Reports", Icon: FileIcon },
+                  {
+                      path: "/documents",
+                      label: "Team Documents",
+                      Icon: FileIcon,
+                  },
                   ...(isManager
                       ? [
                             {
