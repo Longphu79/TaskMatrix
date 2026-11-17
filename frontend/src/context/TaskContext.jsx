@@ -26,6 +26,7 @@ function normalizeTask(t) {
         priority: t.priority || t.Priority || "Medium",
         status: t.status || t.Status || "Pending",
         progress: t.progress ?? t.Progress ?? 0,
+        subTasks: t.subTasks || t.SubTasks || [],
         // AI Verification fields
         aiVerificationReason:
             t.aiVerificationReason || t.AiVerificationReason || "",

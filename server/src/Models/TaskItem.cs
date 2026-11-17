@@ -3,6 +3,23 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace TaskMatrix.Api.Models;
 
+
+public class SubTaskItem
+{
+    [BsonId]
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
+
+    [BsonElement("title")]
+    public string Title { get; set; } = string.Empty;
+
+    [BsonElement("isCompleted")]
+    public bool IsCompleted { get; set; } = false;
+
+    [BsonElement("createdAt")]
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
 [BsonIgnoreExtraElements]
 public class TaskItem
 {
@@ -44,6 +61,9 @@ public class TaskItem
     // Tiến độ hoàn thành công việc (0 - 100%)
     [BsonElement("progress")]
     public int Progress { get; set; } = 0;
+
+    [BsonElement("subtasks")]
+    public List<SubTaskItem> SubTasks { get; set; } = new();
 
     // --- QUẢN LÝ THỜI GIAN & TIMESHEETS ---
 

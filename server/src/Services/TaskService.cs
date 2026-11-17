@@ -102,11 +102,13 @@ public class TaskService
         existingTask.Description = updatedData.Description;
         existingTask.Priority = updatedData.Priority;
         existingTask.Status = updatedData.Status;
-        existingTask.Progress = updatedData.Progress;
+        existingTask.Progress = updatedData.Progress; // FE đã tính % gửi xuống đây
         existingTask.WorkspaceId = updatedData.WorkspaceId;
         existingTask.DueDate = updatedData.DueDate;
         existingTask.StartTime = updatedData.StartTime;
         existingTask.EndTime = updatedData.EndTime;
+
+        existingTask.SubTasks = updatedData.SubTasks ?? new List<SubTaskItem>();
 
         if (!string.IsNullOrEmpty(updatedData.AiVerificationReason))
             existingTask.AiVerificationReason = updatedData.AiVerificationReason;
@@ -123,7 +125,6 @@ public class TaskService
 
         return result.MatchedCount > 0;
     }
-
     // 5. Xóa Task
     public async Task<bool> DeleteTaskAsync(string id, string userId)
     {
@@ -131,5 +132,46 @@ public class TaskService
             t => t.Id == id && (t.UserId == userId || string.IsNullOrEmpty(t.UserId))
         );
         return result.DeletedCount > 0;
+    }
+
+    private static void NormalizeSubTasksAndProgress(TaskItem task)
+    {
+        task.SubTasks ??= new List<SubTaskItem>();
+
+        foreach (var sub in task.SubTasks)
+        {
+            if (string.IsNullOrWhiteSpace(sub.Id) || !MongoDB.Bson.ObjectId.TryParse(sub.Id, out _))
+            {
+                sub.Id = MongoDB.Bson.ObjectId.GenerateNewId().ToString();
+            }
+        }
+
+        if (task.SubTasks.Count > 0)
+        {
+            int doneCount = task.SubTasks.Count(s => s.IsCompleted);
+            task.Progress = (int)Math.Round((double)doneCount / task.SubTasks.Count * 100);
+            task.Status = task.Progress == 100 ? "Completed" : "Pending";
+        }
+    }
+
+    // Hàm nối thêm sub-tasks vào task có sẵn khi AI trả về intent "ADD_SUBTASKS"
+    public async Task<bool> AppendSubTasksByTitleAsync(string userId, string targetTitle, List<SubTaskItem> newSubTasks)
+    {
+        if (string.IsNullOrWhiteSpace(targetTitle) || newSubTasks == null || newSubTasks.Count == 0)
+            return false;
+
+        var userTasks = await GetTasksByWorkspaceAsync("personal", userId);
+        var targetTask = userTasks.FirstOrDefault(t =>
+            t.Title.Contains(targetTitle, StringComparison.OrdinalIgnoreCase));
+
+        if (targetTask == null) return false;
+
+        targetTask.SubTasks ??= new List<SubTaskItem>();
+        targetTask.SubTasks.AddRange(newSubTasks);
+        NormalizeSubTasksAndProgress(targetTask);
+        targetTask.UpdatedAt = DateTime.UtcNow;
+
+        var result = await _tasks.ReplaceOneAsync(t => t.Id == targetTask.Id, targetTask);
+        return result.MatchedCount > 0;
     }
 }

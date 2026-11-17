@@ -10,19 +10,28 @@ public class AiService
     private readonly HttpClient _httpClient;
     private readonly string _apiKey;
     private readonly AiMemoryService _memoryService;
+    private readonly TaskService _taskService;
 
     private static readonly Uri GroqEndpointUri = new Uri("https://api.groq.com/openai/v1/chat/completions", UriKind.Absolute);
 
-    public AiService(HttpClient httpClient, IConfiguration config, AiMemoryService memoryService)
+    public AiService(
+        HttpClient httpClient,
+        IConfiguration config,
+        AiMemoryService memoryService,
+        TaskService taskService)
     {
         _httpClient = httpClient;
         _apiKey = config["Groq:ApiKey"] ?? throw new ArgumentNullException("Thiếu Groq API Key trong appsettings.json");
         _memoryService = memoryService;
+        _taskService = taskService;
     }
 
-    public async Task<AiResponseDto?> ProcessUserPromptAsync(string userId, string userPrompt, string timeZone)
+    public async Task<AiResponseDto?> ProcessUserPromptAsync(
+        string userId,
+        string userPrompt,
+        string timeZone,
+        IFormFile? image = null)
     {
-        // 🟢 Tính toán thời gian ĐỊA PHƯƠNG theo Múi giờ của người dùng (Tránh lỗi UTC+7 bị lùi 7 tiếng)
         DateTime localNow;
         try
         {
@@ -31,55 +40,78 @@ public class AiService
         }
         catch
         {
-            // Mặc định múi giờ Việt Nam (SE Asia Standard Time / UTC+7)
             localNow = DateTime.UtcNow.AddHours(7);
         }
 
+        // Lấy tối đa 15 task gần nhất kèm ID để AI chọn chính xác khi sửa/xóa
+        var recentTasks = await _taskService.GetTasksByWorkspaceAsync("personal", userId);
+        var taskContextLines = recentTasks.Take(15).Select(t =>
+        {
+            var subInfo = (t.SubTasks != null && t.SubTasks.Count > 0)
+                ? $" | Subtasks: {t.SubTasks.Count(s => s.IsCompleted)}/{t.SubTasks.Count} [{string.Join(", ", t.SubTasks.Select(s => s.Title))}]"
+                : "";
+            var timeStr = t.StartTime.HasValue && t.EndTime.HasValue
+                ? $"{t.StartTime.Value:yyyy-MM-dd HH:mm} -> {t.EndTime.Value:HH:mm}"
+                : (t.DueDate.HasValue ? t.DueDate.Value.ToString("yyyy-MM-dd") : "Chưa đặt hạn");
+            return $"- [ID: {t.Id}] \"{t.Title}\" (Status: {t.Status}, Priority: {t.Priority}, Time: {timeStr}{subInfo})";
+        });
+
+        var currentTasksContext = recentTasks.Count > 0
+            ? string.Join("\n", taskContextLines)
+            : "Hiện tại người dùng chưa có công việc nào trong danh sách.";
+
         var systemInstruction = $@"
-Bạn là trợ lý AI thông minh, chuyên nghiệp của hệ thống TaskMatrix. 
-Thời gian ĐỊA PHƯƠNG hiện tại của người dùng: {localNow:yyyy-MM-dd HH:mm:ss} ({localNow.DayOfWeek}). Múi giờ: {timeZone}.
+Bạn là TaskMatrix AI Agent — trợ lý điều phối công việc thông minh của nền tảng quản lý dự án TaskMatrix.
+Thời gian ĐỊA PHƯƠNG hiện tại: {localNow:yyyy-MM-dd HH:mm:ss} ({localNow.DayOfWeek}). Múi giờ: {timeZone}.
 
-QUY TẮC TÍNH THỜI GIAN:
-- Mọi ngày giờ trong JSON (dueDate, startTime, endTime) PHẢI tính hoàn toàn theo GIỜ ĐỊA PHƯƠNG nêu trên.
-- Ví dụ: Người dùng nói ""3h chiều ngày mai"", với thời gian hiện tại là {localNow:yyyy-MM-dd}, thì dueDate phải là {localNow.AddDays(1):yyyy-MM-dd}T15:00:00.
+### 1. KIẾN THỨC VỀ HỆ THỐNG WEB TASKMATRIX
+- **To-Do / Projects & Tasks:** Quản lý task theo mức độ ưu tiên (Low, Medium, High), hạn chót, khung giờ và thanh tiến độ (%). Mỗi task lớn có thể chia thành nhiều **Sub-tasks (Checklist)**.
+- **Workspaces:** Không gian cá nhân (`personal`) và không gian nhóm (Manager / Member).
+- **Timesheets:** Lịch làm việc theo Tuần (Week) và Tháng (Month), thống kê giờ lên lịch và tiến độ hoàn thành.
+- **AI Verify Proof:** Nút ""AI Verify Proof"" trên từng thẻ task để tải ảnh bằng chứng hoàn thành cho AI kiểm duyệt.
+- **Các phân hệ khác:** Dashboard, Analytics, Reports, Documents.
 
-QUYỀN CRUD TASK:
-Bạn hỗ trợ 4 ý định (intent):
+### 2. DANH SÁCH TASK HIỆN TẠI CỦA NGƯỜI DÙNG
+{currentTasksContext}
+
+### 3. QUY TẮC XỬ LÝ QUAN TRỌNG
+- **Phân biệt CREATE_TASK và UPDATE_TASK:** Nếu user nói ""fix lại"", ""sửa lại"", ""đổi giờ"", ""chỉnh lại"", ""dời sang"" cho công việc ĐÃ CÓ hoặc vừa tạo ở lượt trước -> BẮT BUỘC dùng `UPDATE_TASK` và điền đúng `targetTaskId` lấy từ `[ID: ...]`. KHÔNG tạo task mới trùng tên.
+- **Chọn đúng ID khi trùng tên:** Nếu có nhiều task cùng tên ở các khung giờ khác nhau, đối chiếu khung giờ user nhắc tới để lấy đúng `targetTaskId`.
+- **Thời gian:** Mọi ngày giờ tính theo GIỜ ĐỊA PHƯƠNG. Nếu không nêu giờ cụ thể khi tạo mới, mặc định `startTime` là `09:00:00` và `endTime` là `10:00:00`.
+- **Sub-tasks:** Bóc tách đầy đủ các việc nhỏ vào mảng `subTasks` nếu user có nhắc tới.
+- **Hình ảnh đính kèm:** Nếu user gửi ảnh, hãy quan sát kỹ nội dung ảnh để giải đáp thắc mắc, sửa lỗi, hoặc trích xuất lịch/việc cần làm nếu user yêu cầu.
+
+### 4. CÁC Ý ĐỊNH (INTENT) HỖ TRỢ
 1. ""CREATE_TASK"": Tạo công việc mới.
-2. ""UPDATE_TASK"": Cập nhật/sửa công việc đã có (ví dụ: đổi giờ, đổi tiêu đề, đổi độ ưu tiên).
-3. ""DELETE_TASK"": Xóa công việc.
-4. ""CHAT"": Trò chuyện, giải đáp thắc mắc thông thường.
+2. ""UPDATE_TASK"": Cập nhật công việc đã có.
+3. ""ADD_SUBTASKS"": Thêm việc nhỏ vào một task đã tồn tại.
+4. ""DELETE_TASK"": Xóa công việc.
+5. ""CHAT"": Trò chuyện, giải đáp câu hỏi (kể cả câu hỏi về hình ảnh gửi kèm) hoặc hướng dẫn dùng web.
 
-PHONG CÁCH GIAO TIẾP:
-- Luôn giữ thái độ lịch sự, thân thiện, ân cần (dùng ""Dạ"", ""bạn"", ""mình"").
-
-QUAN TRỌNG: Bạn PHẢI trả về kết quả dưới định dạng JSON thuần túy, KHÔNG bọc trong markdown (```json).
+PHONG CÁCH GIAO TIẾP: Lịch sự, thân thiện (dùng ""Dạ"", ""bạn"", ""mình"").
+QUAN TRỌNG: Trả về duy nhất JSON thuần túy, KHÔNG bọc trong markdown (```json).
 
 Cấu trúc JSON bắt buộc:
 {{
-  ""intent"": ""CREATE_TASK"" | ""UPDATE_TASK"" | ""DELETE_TASK"" | ""CHAT"",
-  ""replyMessage"": ""Câu trả lời lịch sự xác nhận hành động của bạn"",
-  ""targetTaskTitle"": ""Tên hoặc từ khóa của task cần sửa hoặc xóa (Chỉ dùng khi intent là UPDATE_TASK hoặc DELETE_TASK, nếu không hãy để null)"",
+  ""intent"": ""CREATE_TASK"" | ""UPDATE_TASK"" | ""ADD_SUBTASKS"" | ""DELETE_TASK"" | ""CHAT"",
+  ""replyMessage"": ""Câu trả lời lịch sự, rõ ràng"",
+  ""targetTaskId"": ""ID trong dấu [ID: ...] nếu intent là UPDATE_TASK, ADD_SUBTASKS hoặc DELETE_TASK, ngược lại null"",
+  ""targetTaskTitle"": ""Tên task tương ứng hoặc null"",
   ""task"": {{
       ""title"": ""Tiêu đề công việc"",
       ""description"": ""Mô tả ngắn gọn"",
       ""priority"": ""High"" | ""Medium"" | ""Low"",
       ""dueDate"": ""YYYY-MM-DDTHH:mm:ss"",
       ""startTime"": ""YYYY-MM-DDTHH:mm:ss"",
-      ""endTime"": ""YYYY-MM-DDTHH:mm:ss""
-  }} // Nếu intent là CHAT hoặc DELETE_TASK, hãy để task là null
+      ""endTime"": ""YYYY-MM-DDTHH:mm:ss"",
+      ""subTasks"": [
+          {{ ""title"": ""Tên việc nhỏ"", ""isCompleted"": false }}
+      ]
+  }}
 }}
 ";
 
-        var fallbackModels = new[]
-        {
-            "openai/gpt-oss-20b",
-            "openai/gpt-oss-120b",
-            "qwen/qwen3.8-27b"
-        };
-
-        var history = await _memoryService.GetRecentHistoryAsync(userId, limit: 10);
-
+        var history = await _memoryService.GetRecentHistoryAsync(userId, limit: 6);
         var messagesList = new List<object>
         {
             new { role = "system", content = systemInstruction }
@@ -90,13 +122,45 @@ Cấu trúc JSON bắt buộc:
             messagesList.Add(new { role = msg.Role, content = msg.Content });
         }
 
-        messagesList.Add(new { role = "user", content = userPrompt });
+        bool hasImage = image != null && image.Length > 0;
+        string finalPrompt = string.IsNullOrWhiteSpace(userPrompt)
+            ? "Hãy xem hình ảnh này và giải đáp hoặc hỗ trợ công việc giúp mình nhé."
+            : userPrompt;
+        string memoryLogText = hasImage ? $"[Đã gửi hình ảnh] {finalPrompt}" : finalPrompt;
 
-        foreach (var model in fallbackModels)
+        if (hasImage)
+        {
+            using var ms = new MemoryStream();
+            await image!.CopyToAsync(ms);
+            var base64 = Convert.ToBase64String(ms.ToArray());
+            var imageDataUrl = $"data:{image.ContentType};base64,{base64}";
+
+            messagesList.Add(new
+            {
+                role = "user",
+                content = new object[]
+                {
+                    new { type = "text", text = finalPrompt },
+                    new { type = "image_url", image_url = new { url = imageDataUrl } }
+                }
+            });
+        }
+        else
+        {
+            messagesList.Add(new { role = "user", content = finalPrompt });
+        }
+
+        // Lưu ý: Bạn có thể thay tên model Vision cho khớp với VisionService.cs của bạn nếu cần
+        var modelsToUse = hasImage
+            ? new[] { "qwen/qwen3.8-27b" }
+            : new[] { "openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.8-27b" };
+
+        foreach (var model in modelsToUse)
         {
             var requestBody = new
             {
                 model = model,
+                temperature = 0.1,
                 response_format = new { type = "json_object" },
                 messages = messagesList
             };
@@ -122,11 +186,12 @@ Cấu trúc JSON bắt buộc:
 
                     if (!string.IsNullOrEmpty(content))
                     {
-                        var result = JsonSerializer.Deserialize<AiResponseDto>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        var cleanJson = content.Replace("```json", "").Replace("```", "").Trim();
+                        var result = JsonSerializer.Deserialize<AiResponseDto>(cleanJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
                         if (result != null)
                         {
-                            await _memoryService.SaveMessageAsync(userId, "user", userPrompt);
+                            await _memoryService.SaveMessageAsync(userId, "user", memoryLogText);
                             await _memoryService.SaveMessageAsync(userId, "assistant", result.ReplyMessage);
                         }
 
@@ -143,7 +208,7 @@ Cấu trúc JSON bắt buộc:
         return new AiResponseDto
         {
             Intent = "CHAT",
-            ReplyMessage = "Dạ, hiện tại hệ thống AI đang gặp chút gián đoạn. Bạn vui lòng thử lại sau nhé!",
+            ReplyMessage = "Dạ, hiện tại hệ thống AI chưa xử lý được yêu cầu này. Bạn vui lòng thử lại sau nhé!",
             Task = null
         };
     }
