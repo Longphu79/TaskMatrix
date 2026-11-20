@@ -14,6 +14,8 @@ import AnalyticsPage from "./pages/Analytics";
 import TimesheetsPage from "./features/Task/pages/Timesheets";
 import TodoPage from "./features/Task/pages/Todo";
 import DocumentPage from "./pages/Documents";
+import BoardPage from "./pages/Board";
+import ProfilePage from "./pages/Profile";
 import SettingsPage from "./pages/Settings";
 import ChatPage from "./pages/Chat";
 import ManageMembers from "./pages/ManageMembers";
@@ -131,6 +133,8 @@ export default function App() {
                 {/* PROTECTED ROUTES (Được bọc bởi MainLayout) */}
                 <Route element={<ProtectedRoute />}>
                     <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/board" element={<BoardPage />} />
+                    <Route path="/profile" element={<ProfilePage />} />
                     <Route path="/analytics" element={<AnalyticsPage />} />
                     <Route path="/timesheets" element={<TimesheetsPage />} />
                     <Route path="/ai-agent" element={<AiAgentChat />} />{" "}

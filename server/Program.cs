@@ -22,6 +22,7 @@ builder.Services.AddScoped<IMongoDatabase>(sp =>
 
 
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<TaskService>();
 builder.Services.AddSingleton<AiMemoryService>();

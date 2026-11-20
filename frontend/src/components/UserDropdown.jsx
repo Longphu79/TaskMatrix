@@ -129,7 +129,7 @@ export default function UserDropdown() {
                 </div>
                 <div className="relative">
                     <img
-                        src={AVATAR}
+                        src={user?.avatar || AVATAR}
                         alt={displayName}
                         className="h-10 w-10 shrink-0 rounded-full bg-canvas object-cover"
                     />
@@ -147,7 +147,7 @@ export default function UserDropdown() {
                     <div className="p-4">
                         <div className="flex items-center gap-3">
                             <img
-                                src={AVATAR}
+                                src={user?.avatar || AVATAR}
                                 alt={displayName}
                                 className="h-12 w-12 rounded-full bg-canvas object-cover"
                             />
@@ -213,7 +213,7 @@ export default function UserDropdown() {
                         <MenuItem
                             Icon={UserIcon}
                             label="My Profile"
-                            onClick={() => go("/settings")}
+                            onClick={() => go("/profile")}
                         />
                         <MenuItem
                             Icon={CogIcon}

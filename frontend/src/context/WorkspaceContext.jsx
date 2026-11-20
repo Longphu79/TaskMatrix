@@ -128,6 +128,7 @@ export function WorkspaceProvider({ children }) {
         return isPersonal
             ? [
                   { path: "/dashboard", label: "Dashboard", Icon: GridIcon },
+                  { path: "/board", label: "Board", Icon: GridIcon },
                   { path: "/analytics", label: "Analytics", Icon: ChartIcon },
                   { path: "/timesheets", label: "Timesheets", Icon: ClockIcon },
                   { path: "/ai-agent", label: "AI Agent", Icon: RobotIcon },
@@ -141,6 +142,7 @@ export function WorkspaceProvider({ children }) {
                       label: "Team Dashboard",
                       Icon: GridIcon,
                   },
+                  { path: "/board", label: "Board", Icon: GridIcon },
                   {
                       path: "/projects",
                       label: "Projects & Tasks",

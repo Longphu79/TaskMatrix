@@ -103,6 +103,15 @@ export function AuthProvider({ children }) {
     // 4. Đăng xuất (Xóa sạch token và dữ liệu user)
     const logout = () => persist(null, null);
 
+    const updateUser = (updates) => {
+        setUser((currentUser) => {
+            if (!currentUser) return currentUser;
+            const updatedUser = { ...currentUser, ...updates };
+            localStorage.setItem("tasky-user", JSON.stringify(updatedUser));
+            return updatedUser;
+        });
+    };
+
     return (
         <AuthContext.Provider
             value={{
@@ -112,6 +121,7 @@ export function AuthProvider({ children }) {
                 signup,
                 googleLogin,
                 logout,
+                updateUser,
             }}
         >
             {children}
