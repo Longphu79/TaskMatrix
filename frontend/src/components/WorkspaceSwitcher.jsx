@@ -5,7 +5,7 @@ import { useWorkspace } from "../context/WorkspaceContext";
 import { ChevronDownIcon, UserIcon, BuildingIcon } from "./icon";
 import apiClient from "../services/apiClient";
 
-export default function WorkspaceSwitcher({ onSwitch }) {
+export default function WorkspaceSwitcher({ onSwitch, collapsed = false }) {
     const {
         workspaces,
         currentWorkspace,
@@ -23,13 +23,16 @@ export default function WorkspaceSwitcher({ onSwitch }) {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
-    // 🟢 State quản lý Modal xác nhận Rời Workspace
+    // State quản lý Modal xác nhận Rời Workspace
     const [leaveTargetWs, setLeaveTargetWs] = useState(null);
     const [leaveLoading, setLeaveLoading] = useState(false);
 
     const root = useRef(null);
     const trigger = useRef(null);
     const dialogRef = useRef(null);
+
+    const CurrentIcon =
+        currentWorkspace.type === "personal" ? UserIcon : BuildingIcon;
 
     useEffect(() => {
         if (!open) return;
@@ -70,14 +73,14 @@ export default function WorkspaceSwitcher({ onSwitch }) {
         onSwitch?.();
     };
 
-    // 🟢 Mở Custom Modal xác nhận (thay cho window.confirm)
+    // Mở Custom Modal xác nhận (thay cho window.confirm)
     const handleLeaveClick = (e, workspace) => {
         e.stopPropagation();
         setOpen(false);
         setLeaveTargetWs(workspace);
     };
 
-    // 🟢 Thực thi Rời khỏi Workspace
+    // Thực thi Rời khỏi Workspace
     const confirmLeaveWorkspace = async () => {
         if (!leaveTargetWs) return;
 
@@ -172,20 +175,20 @@ export default function WorkspaceSwitcher({ onSwitch }) {
                     className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition ${
                         selected
                             ? "bg-brand-soft dark:bg-amber-400/10"
-                            : "hover:bg-canvas"
+                            : "hover:bg-canvas dark:hover:bg-slate-800"
                     }`}
                 >
                     <span
                         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
                             selected
                                 ? "bg-brand text-slate-950"
-                                : "bg-canvas text-muted"
+                                : "bg-canvas text-muted dark:bg-slate-800"
                         }`}
                     >
                         <Icon width={17} height={17} />
                     </span>
                     <span className="min-w-0 flex-1 pr-6">
-                        <span className="block truncate text-sm font-semibold text-ink">
+                        <span className="block truncate text-sm font-semibold text-ink dark:text-white">
                             {workspace.name}
                         </span>
                         <span className="mt-0.5 block text-[10px] text-muted">
@@ -231,17 +234,42 @@ export default function WorkspaceSwitcher({ onSwitch }) {
 
     return (
         <div className="relative mt-6" ref={root}>
-            <span className="mb-2 block px-1 text-xs font-medium text-muted">
+            <span
+                className={`mb-2 block px-1 text-xs font-medium text-muted ${
+                    collapsed ? "lg:hidden" : ""
+                }`}
+            >
                 Workspace
             </span>
+
             <button
                 ref={trigger}
                 aria-expanded={open}
                 aria-controls="workspace-popover"
+                title={
+                    collapsed
+                        ? `Workspace: ${currentWorkspace.name}`
+                        : undefined
+                }
                 onClick={() => setOpen((previous) => !previous)}
-                className="flex w-full items-center gap-2 rounded-2xl border border-hairline px-4 py-3 text-sm font-medium text-ink transition hover:border-brand focus-visible:outline-2 focus-visible:outline-brand"
+                className={`flex items-center rounded-2xl border border-hairline text-sm font-medium text-ink transition hover:border-brand focus-visible:outline-2 focus-visible:outline-brand dark:border-slate-700 dark:text-white ${
+                    collapsed
+                        ? "w-full gap-2 px-4 py-3 lg:mx-auto lg:h-12 lg:w-12 lg:justify-center lg:gap-0 lg:p-0"
+                        : "w-full gap-2 px-4 py-3"
+                }`}
             >
-                <span className="min-w-0 flex-1 truncate text-left">
+                {collapsed && (
+                    <CurrentIcon
+                        width={19}
+                        height={19}
+                        className="hidden shrink-0 lg:block"
+                    />
+                )}
+                <span
+                    className={`min-w-0 flex-1 truncate text-left ${
+                        collapsed ? "lg:hidden" : ""
+                    }`}
+                >
                     {currentWorkspace.name}
                 </span>
                 <ChevronDownIcon
@@ -249,9 +277,10 @@ export default function WorkspaceSwitcher({ onSwitch }) {
                     height={16}
                     className={`text-muted transition-transform duration-200 ${
                         open ? "rotate-180" : ""
-                    }`}
+                    } ${collapsed ? "lg:hidden" : ""}`}
                 />
             </button>
+
             <div
                 id="workspace-popover"
                 aria-label="Choose workspace"
@@ -268,14 +297,14 @@ export default function WorkspaceSwitcher({ onSwitch }) {
                 {workspaces
                     .filter((workspace) => workspace.type === "personal")
                     .map(row)}
-                <div className="my-2 border-t border-hairline" />
+                <div className="my-2 border-t border-hairline dark:border-slate-800" />
                 <p className="px-3 pb-2 pt-2 text-[9px] font-semibold tracking-[0.12em] text-muted">
                     COMPANY WORKSPACES
                 </p>
                 {workspaces
                     .filter((workspace) => workspace.type === "company")
                     .map(row)}
-                <div className="my-2 border-t border-hairline" />
+                <div className="my-2 border-t border-hairline dark:border-slate-800" />
                 <button
                     onClick={() => {
                         setOpen(false);
@@ -284,7 +313,7 @@ export default function WorkspaceSwitcher({ onSwitch }) {
                         setMode("create");
                         setDialog(true);
                     }}
-                    className="w-full rounded-xl px-3 py-3 text-left text-xs font-semibold text-ink transition hover:bg-canvas"
+                    className="w-full rounded-xl px-3 py-3 text-left text-xs font-semibold text-ink transition hover:bg-canvas dark:text-white dark:hover:bg-slate-800"
                 >
                     ＋ Create or Join Company
                 </button>
@@ -399,7 +428,7 @@ export default function WorkspaceSwitcher({ onSwitch }) {
                     document.body,
                 )}
 
-            {/* 🟢 CUSTOM MODAL XÁC NHẬN RỜI WORKSPACE */}
+            {/* CUSTOM MODAL XÁC NHẬN RỜI WORKSPACE */}
             {leaveTargetWs &&
                 createPortal(
                     <div

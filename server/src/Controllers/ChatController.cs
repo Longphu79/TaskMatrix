@@ -47,4 +47,26 @@ public class ChatController : ControllerBase
         var messages = await _chatService.GetDirectMessagesAsync(workspaceId, GetUserId(), targetUserId);
         return Ok(messages);
     }
+
+    [HttpDelete("messages/{messageId}")]
+    public async Task<IActionResult> DeleteMessage(string messageId)
+    {
+        var deleted = await _chatService.DeleteMessageAsync(messageId, GetUserId());
+        if (!deleted) return NotFound();
+        return NoContent();
+    }
+
+    [HttpDelete("channels/{channelId}/messages")]
+    public async Task<IActionResult> ClearChannelMessages(string channelId)
+    {
+        await _chatService.ClearChannelMessagesAsync(channelId);
+        return NoContent();
+    }
+
+    [HttpDelete("workspaces/{workspaceId}/dm/{targetUserId}/messages")]
+    public async Task<IActionResult> ClearDmMessages(string workspaceId, string targetUserId)
+    {
+        await _chatService.ClearDirectMessagesAsync(workspaceId, GetUserId(), targetUserId);
+        return NoContent();
+    }
 }

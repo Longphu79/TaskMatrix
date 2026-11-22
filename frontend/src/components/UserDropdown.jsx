@@ -13,14 +13,31 @@ import {
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 
-const AVATAR =
-    "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&h=120&fit=crop&auto=format";
+const API_BASE_URL = "http://localhost:5260";
 
 const STATUSES = [
     { key: "online", label: "Online", color: "#3fb27f" },
     { key: "away", label: "Away", color: "#f6c62e" },
     { key: "dnd", label: "Do Not Disturb", color: "#e05656" },
 ];
+
+export function resolveUserAvatar(userObj) {
+    if (!userObj) return null;
+    const raw =
+        userObj.avatarUrl ||
+        userObj.avatar ||
+        userObj.profilePicture ||
+        userObj.picture ||
+        userObj.image ||
+        userObj.user?.avatarUrl ||
+        userObj.user?.avatar ||
+        userObj.user?.profilePicture ||
+        null;
+
+    if (!raw || typeof raw !== "string") return null;
+    if (raw.startsWith("http") || raw.startsWith("data:")) return raw;
+    return `${API_BASE_URL}${raw.startsWith("/") ? "" : "/"}${raw}`;
+}
 
 /* ---------- theme toggle ---------- */
 
@@ -29,7 +46,6 @@ function ThemeToggle({ dark, onChange }) {
         <button
             onClick={(e) => {
                 e.stopPropagation();
-                // Kiểm tra an toàn trước khi gọi hàm để tránh crash
                 if (typeof onChange === "function") {
                     onChange(!dark);
                 }
@@ -71,12 +87,10 @@ function MenuItem({ Icon, label, onClick, trailing }) {
 export default function UserDropdown() {
     const themeCtx = useTheme() || {};
 
-    // Tự động nhận diện biến trạng thái dark/isDark từ ThemeContext
     const dark = Boolean(
         themeCtx.dark ?? themeCtx.isDark ?? themeCtx.isDarkMode,
     );
 
-    // Tự động nhận diện hàm thay đổi theme dù đặt tên là gì
     const handleThemeToggle =
         themeCtx.setDark ||
         themeCtx.setIsDark ||
@@ -87,13 +101,21 @@ export default function UserDropdown() {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
 
-    const displayName = user?.name || "Manjay Gupta";
-    const displayRole = user?.role || "UI/UX Designer";
-    const displayEmail = user?.email || "manjay.gupta@matrixdomain.com";
+    const displayName =
+        user?.fullName || user?.name || user?.email?.split("@")[0] || "User";
+    const displayRole = user?.role || "Member";
+    const displayEmail = user?.email || "";
+    const avatarUrl = resolveUserAvatar(user);
+
+    const [avatarFailed, setAvatarFailed] = useState(false);
     const [open, setOpen] = useState(false);
     const [status, setStatus] = useState("online");
     const [statusOpen, setStatusOpen] = useState(false);
     const ref = useRef(null);
+
+    useEffect(() => {
+        setAvatarFailed(false);
+    }, [avatarUrl]);
 
     useEffect(() => {
         if (!open) return;
@@ -114,6 +136,8 @@ export default function UserDropdown() {
         setOpen(false);
     };
 
+    const showRealAvatar = avatarUrl && !avatarFailed;
+
     return (
         <div className="relative" ref={ref}>
             {/* trigger */}
@@ -128,11 +152,18 @@ export default function UserDropdown() {
                     <div className="text-xs text-muted">{displayRole}</div>
                 </div>
                 <div className="relative">
-                    <img
-                        src={AVATAR}
-                        alt={displayName}
-                        className="h-10 w-10 shrink-0 rounded-full bg-canvas object-cover"
-                    />
+                    {showRealAvatar ? (
+                        <img
+                            src={avatarUrl}
+                            alt={displayName}
+                            onError={() => setAvatarFailed(true)}
+                            className="h-10 w-10 shrink-0 rounded-full bg-canvas object-cover"
+                        />
+                    ) : (
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-bold text-slate-900">
+                            {displayName.charAt(0).toUpperCase()}
+                        </div>
+                    )}
                     <span
                         className="absolute bottom-0 right-0 h-3 w-3 rounded-full ring-2 ring-white"
                         style={{ background: current?.color }}
@@ -146,11 +177,18 @@ export default function UserDropdown() {
                     {/* header */}
                     <div className="p-4">
                         <div className="flex items-center gap-3">
-                            <img
-                                src={AVATAR}
-                                alt={displayName}
-                                className="h-12 w-12 rounded-full bg-canvas object-cover"
-                            />
+                            {showRealAvatar ? (
+                                <img
+                                    src={avatarUrl}
+                                    alt={displayName}
+                                    onError={() => setAvatarFailed(true)}
+                                    className="h-12 w-12 shrink-0 rounded-full bg-canvas object-cover"
+                                />
+                            ) : (
+                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand text-base font-bold text-slate-900">
+                                    {displayName.charAt(0).toUpperCase()}
+                                </div>
+                            )}
                             <div className="min-w-0">
                                 <div className="truncate text-sm font-semibold text-ink">
                                     {displayName}
@@ -158,9 +196,11 @@ export default function UserDropdown() {
                                 <div className="truncate text-xs text-muted">
                                     {displayRole}
                                 </div>
-                                <div className="truncate text-xs text-muted">
-                                    {displayEmail}
-                                </div>
+                                {displayEmail && (
+                                    <div className="truncate text-xs text-muted">
+                                        {displayEmail}
+                                    </div>
+                                )}
                             </div>
                         </div>
 

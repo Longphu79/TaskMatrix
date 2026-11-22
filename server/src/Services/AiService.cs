@@ -212,4 +212,70 @@ Cấu trúc JSON bắt buộc:
             Task = null
         };
     }
+
+    public async Task<string> GenerateTaskBriefingAsync(List<Models.TaskItem> tasks, DateTime localNow)
+    {
+        if (tasks.Count == 0)
+            return "Hôm nay bạn không có công việc nào đến hạn. Hãy tận dụng thời gian cho các kế hoạch mới nhé!";
+
+        // 🟢 Chỉ lấy tối đa 8 task quan trọng nhất để tiết kiệm token
+        var topTasks = tasks.Take(8).ToList();
+
+        var taskLines = topTasks.Select(t =>
+        {
+            var deadline = t.EndTime ?? t.DueDate;
+            var deadlineStr = deadline.HasValue ? deadline.Value.ToString("dd/MM HH:mm") : "Chưa có hạn";
+            var statusTag = deadline.HasValue && deadline.Value < localNow ? "QUÁ HẠN" : "HÔM NAY";
+            return $"- [{statusTag}] {t.Title} ({t.Progress}% - Hạn: {deadlineStr})";
+        });
+
+        var prompt = $@"
+Thời gian hiện tại: {localNow:dd/MM/yyyy HH:mm}.
+Danh sách việc cần xử lý:
+{string.Join("\n", taskLines)}
+
+Hãy tóm tắt cực ngắn gọn bằng tiếng Việt (tối đa 4 dòng, dưới 65 từ):
+- Dòng 1: Báo tổng số việc quá hạn và việc cần làm hôm nay.
+- Các dòng sau: Liệt kê 2-3 việc ưu tiên nhất kèm % tiến độ.
+QUY TẮC: Không dùng ký tự markdown (** hay #), không chào hỏi, không viết lời khuyên dài dòng.";
+
+        var requestBody = new
+        {
+            model = "openai/gpt-oss-20b",
+            temperature = 0.2,
+            messages = new object[]
+            {
+            new { role = "user", content = prompt }
+            }
+        };
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, GroqEndpointUri);
+        request.Headers.Add("Authorization", $"Bearer {_apiKey}");
+        request.Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+
+        try
+        {
+            var response = await _httpClient.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(json);
+                var text = doc.RootElement
+                    .GetProperty("choices")[0]
+                    .GetProperty("message")
+                    .GetProperty("content")
+                    .GetString();
+
+                if (!string.IsNullOrWhiteSpace(text))
+                    return text.Replace("**", "").Trim();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[AI Briefing Error]: {ex.Message}");
+        }
+
+        return $"Bạn có {tasks.Count} công việc cần xử lý hôm nay và sắp đến hạn:\n" +
+               string.Join("\n", topTasks.Take(3).Select(t => $"• {t.Title} ({t.Progress}%)"));
+    }
 }

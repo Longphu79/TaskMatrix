@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 /* ---------- COLOR & FORMATTING HELPERS ---------- */
 
@@ -25,20 +25,74 @@ export const initials = (name = "") =>
         .toUpperCase() || "U";
 
 export const EMOJI_QUICK = ["👍", "❤️", "🚀", "💬"];
-export const EMOJI_ALL = [
-    "😀",
-    "😂",
-    "😍",
-    "🤔",
-    "🎉",
-    "🔥",
-    "👏",
-    "🙏",
-    "✅",
-    "👀",
-    "💡",
-    "🚀",
+
+export const EMOJI_GROUPS = [
+    {
+        label: "Biểu cảm",
+        emojis: [
+            "😀",
+            "😂",
+            "🥹",
+            "😍",
+            "🥰",
+            "😎",
+            "🤔",
+            "😅",
+            "😭",
+            "😤",
+            "🥳",
+            "🤯",
+            "😴",
+            "🤗",
+            "🙄",
+            "😬",
+        ],
+    },
+    {
+        label: "Cử chỉ",
+        emojis: [
+            "👍",
+            "👎",
+            "👏",
+            "🙌",
+            "🤝",
+            "🙏",
+            "✌️",
+            "🤞",
+            "👌",
+            "💪",
+            "🫡",
+            "🫶",
+            "❤️",
+            "🔥",
+            "✨",
+            "🎉",
+        ],
+    },
+    {
+        label: "Công việc",
+        emojis: [
+            "💻",
+            "🚀",
+            "🐛",
+            "✅",
+            "❌",
+            "⚠️",
+            "📌",
+            "📎",
+            "📅",
+            "⏰",
+            "💡",
+            "📊",
+            "📝",
+            "🔍",
+            "⚙️",
+            "☕",
+        ],
+    },
 ];
+
+export const EMOJI_ALL = EMOJI_GROUPS.flatMap((g) => g.emojis);
 
 export const dayLabel = (ts) => {
     if (!ts) return "Today";
@@ -63,36 +117,6 @@ export const timeLabel = (ts) => {
         minute: "2-digit",
     });
 };
-
-const KEYWORDS =
-    /\b(export|async|function|const|let|var|return|await|import|from|if|else|new|class|public|private|static|void|string|int|true|false|null)\b/;
-function highlight(code) {
-    const re = new RegExp(
-        `(\\/\\/.*$)|("(?:[^"\\\\]|\\\\.)*"|'(?:[^'\\\\]|\\\\.)*'|\`(?:[^\`\\\\]|\\\\.)*\`)|${KEYWORDS.source}|(\\b\\d+\\b)`,
-        "gm",
-    );
-    const out = [];
-    let last = 0;
-    let m;
-    while ((m = re.exec(code))) {
-        if (m.index > last) out.push(code.slice(last, m.index));
-        const cls = m[1]
-            ? "text-slate-500 italic"
-            : m[2]
-              ? "text-emerald-300"
-              : m[3]
-                ? "text-amber-300"
-                : "text-sky-300";
-        out.push(
-            <span key={m.index} className={cls}>
-                {m[0]}
-            </span>,
-        );
-        last = m.index + m[0].length;
-    }
-    out.push(code.slice(last));
-    return out;
-}
 
 function inline(text, key) {
     if (!text) return "";
@@ -211,6 +235,17 @@ export const ICONS = {
         "M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z",
         "M14 3v5h5",
     ],
+    image: [
+        "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z",
+        "M9 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z",
+        "m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21",
+    ],
+    trash: [
+        "M3 6h18",
+        "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6",
+        "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2",
+    ],
+    phone: "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z",
     download: "M12 3v12m0 0-4-4m4 4 4-4M4 20h16",
     close: "M18 6 6 18M6 6l12 12",
     check: "m5 13 4 4L19 7",
@@ -560,19 +595,31 @@ export function Composer({
                 />
             )}
             {emojiOpen && (
-                <div className="absolute bottom-full left-24 z-20 mb-2 grid w-56 grid-cols-6 gap-1 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700">
-                    {EMOJI_ALL.map((e) => (
-                        <button
-                            key={e}
-                            onClick={() => {
-                                insert(e);
-                                setEmojiOpen(false);
-                            }}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-lg hover:bg-slate-100 dark:hover:bg-slate-700"
-                        >
-                            {e}
-                        </button>
-                    ))}
+                <div className="absolute bottom-full left-24 z-20 mb-2 max-h-60 w-72 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-700 dark:bg-slate-800">
+                    <div className="space-y-3">
+                        {EMOJI_GROUPS.map((group) => (
+                            <div key={group.label}>
+                                <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                    {group.label}
+                                </p>
+                                <div className="grid grid-cols-8 gap-1">
+                                    {group.emojis.map((e) => (
+                                        <button
+                                            key={e}
+                                            type="button"
+                                            onClick={() => {
+                                                insert(e);
+                                                setEmojiOpen(false);
+                                            }}
+                                            className="flex h-7 w-7 items-center justify-center rounded-lg text-base hover:bg-slate-100 dark:hover:bg-slate-700"
+                                        >
+                                            {e}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
             {mentionOpen && (
@@ -616,9 +663,9 @@ export function Composer({
                         <button
                             type="button"
                             onClick={onCancelReply}
-                            className="h-6 w-6 shrink-0 rounded-full text-slate-400 transition hover:bg-slate-200 hover:text-slate-800 dark:hover:bg-slate-700 dark:hover:text-white"
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-200 hover:text-slate-800 dark:hover:bg-slate-700 dark:hover:text-white"
                         >
-                            ✕
+                            <Ic n="close" size={13} />
                         </button>
                     </div>
                 )}
