@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { BellIcon, SearchIcon, MenuIcon } from "../components/icon";
+import { SearchIcon, MenuIcon } from "../components/icon";
+import NotificationBell from "../features/Notification/components/NotificationBell";
 import UserDropdown from "../components/UserDropdown";
 import WorkspaceSwitcher from "../components/WorkspaceSwitcher";
 import { useWorkspace } from "../context/WorkspaceContext";
+import AllCallListener from "../components/AllCallListener";
 
 function Sidebar({ open, onClose, collapsed }) {
     const navigate = useNavigate();
@@ -135,11 +137,8 @@ function Topbar({ onMenu }) {
                 />
             </div>
 
-            {/* Nút Thông báo */}
-            <button className="relative ml-auto rounded-full bg-white p-2.5 text-ink transition hover:text-brand dark:bg-slate-800 dark:text-white sm:ml-0">
-                <BellIcon width={20} height={20} />
-                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-brand ring-2 ring-white dark:ring-slate-800" />
-            </button>
+            {/* Chuông Thông báo (Workspace + AI Briefing) */}
+            <NotificationBell className="ml-auto sm:ml-0" />
 
             {/* User Dropdown */}
             <UserDropdown onNavigate={(key) => navigate(`/${key}`)} />
@@ -161,6 +160,7 @@ export default function MainLayout() {
 
     return (
         <div className="flex h-screen w-full overflow-hidden bg-canvas dark:bg-slate-950">
+            <AllCallListener />
             <Sidebar
                 open={sidebarOpen}
                 onClose={() => setSidebarOpen(false)}

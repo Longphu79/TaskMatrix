@@ -119,4 +119,35 @@ public class ChatService
         Time: m.CreatedAt.ToLocalTime().ToString("hh:mm tt"),
         CreatedAt: m.CreatedAt
     );
+
+    public async Task<bool> DeleteMessageAsync(string messageId, string userId)
+    {
+        var result = await _messages.DeleteOneAsync(m => m.Id == messageId && m.SenderId == userId);
+        return result.DeletedCount > 0;
+    }
+
+    public async Task ClearChannelMessagesAsync(string channelId)
+    {
+        await _messages.DeleteManyAsync(m => m.ChannelId == channelId);
+    }
+
+    public async Task ClearDirectMessagesAsync(string workspaceId, string user1Id, string user2Id)
+    {
+        var filter = Builders<TeamChatMessage>.Filter.And(
+            Builders<TeamChatMessage>.Filter.Eq(m => m.WorkspaceId, workspaceId),
+            Builders<TeamChatMessage>.Filter.Eq(m => m.ChannelId, null),
+            Builders<TeamChatMessage>.Filter.Or(
+                Builders<TeamChatMessage>.Filter.And(
+                    Builders<TeamChatMessage>.Filter.Eq(m => m.SenderId, user1Id),
+                    Builders<TeamChatMessage>.Filter.Eq(m => m.RecipientId, user2Id)
+                ),
+                Builders<TeamChatMessage>.Filter.And(
+                    Builders<TeamChatMessage>.Filter.Eq(m => m.SenderId, user2Id),
+                    Builders<TeamChatMessage>.Filter.Eq(m => m.RecipientId, user1Id)
+                )
+            )
+        );
+
+        await _messages.DeleteManyAsync(filter);
+    }
 }

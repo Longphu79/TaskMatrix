@@ -20,6 +20,12 @@ public class TasksController : ControllerBase
 
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
 
+    private string? CurrentUserName =>
+        User.FindFirstValue(ClaimTypes.Name)
+        ?? User.FindFirstValue("fullName")
+        ?? User.FindFirstValue("name")
+        ?? User.FindFirstValue(ClaimTypes.Email);
+
     // 1. Lấy tất cả Task theo Workspace (Mặc định là "personal")
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] string workspaceId = "personal")
@@ -45,7 +51,7 @@ public class TasksController : ControllerBase
     {
         if (string.IsNullOrEmpty(CurrentUserId)) return Unauthorized();
 
-        var createdTask = await _taskService.CreateTaskAsync(CurrentUserId, task);
+        var createdTask = await _taskService.CreateTaskAsync(CurrentUserId, task, CurrentUserName);
         return CreatedAtAction(nameof(GetById), new { id = createdTask.Id }, createdTask);
     }
 
@@ -55,7 +61,7 @@ public class TasksController : ControllerBase
     {
         if (string.IsNullOrEmpty(CurrentUserId)) return Unauthorized();
 
-        var success = await _taskService.UpdateTaskAsync(id, CurrentUserId, task);
+        var success = await _taskService.UpdateTaskAsync(id, CurrentUserId, task, CurrentUserName);
         if (!success)
             return NotFound(new { message = "Task not found or you don't have permission to update it" });
 

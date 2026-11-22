@@ -24,10 +24,13 @@ builder.Services.AddScoped<IMongoDatabase>(sp =>
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<TaskService>();
+builder.Services.AddScoped<AiService>();
+builder.Services.AddScoped<VisionService>();
 builder.Services.AddSingleton<AiMemoryService>();
 builder.Services.AddScoped<WorkspaceService>();
 builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddScoped<NotificationService>();
 
 // Cấu hình nguyên bản của bạn (Không gán BaseAddress)
 builder.Services.AddHttpClient<AiService>(client =>
